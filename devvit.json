@@ -1,0 +1,43 @@
+{
+  "$schema": "https://developers.reddit.com/schema/config-file.v1.json",
+  "name": "llmphysics-bot",
+  "server": {
+    "entry": "index.js"
+  },
+  "permissions": {
+    "redis": true,
+    "reddit": {
+      "enable": true
+    }
+  },
+  "triggers": {
+    "onAppInstall": "/internal/triggers/app-install",
+    "onAppUpgrade": "/internal/triggers/app-upgrade",
+    "onPostSubmit": "/internal/triggers/post-submit",
+    "onCommentCreate": "/internal/triggers/comment-create",
+    "onPostReport": "/internal/triggers/post-report",
+    "onCommentReport": "/internal/triggers/comment-report",
+    "onModAction": "/internal/triggers/mod-action"
+  },
+  "menu": {
+    "items": [
+      {
+        "label": "Remove comment chain",
+        "description": "Mod-remove this comment and all replies recursively",
+        "forUserType": "moderator",
+        "location": "comment",
+        "endpoint": "/internal/menu/remove-comment-chain"
+      },
+      {
+        "label": "Lock comment chain",
+        "description": "Lock this comment and all replies recursively",
+        "forUserType": "moderator",
+        "location": "comment",
+        "endpoint": "/internal/menu/lock-comment-chain"
+      }
+    ]
+  },
+  "scripts": {
+    "build": "npm run build"
+  }
+}
