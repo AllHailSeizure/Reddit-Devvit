@@ -1,6 +1,6 @@
 const MAX_LOG_ENTRIES = 500;
 
-type LogLevel = 'debug' | 'info' | 'warn' | 'error';
+type LogLevel = 'info' | 'warn' | 'error';
 
 function fmt(level: LogLevel, module: string, message: string, extra?: unknown): string {
   const ts = new Date().toISOString();
@@ -23,10 +23,6 @@ async function persist(level: LogLevel, module: string, message: string, extra?:
 
 export function logger(module: string) {
   return {
-    debug(message: string, data?: unknown): void {
-      console.debug(fmt('debug', module, message, data));
-    },
-
     info(message: string, data?: unknown): void {
       console.log(fmt('info', module, message, data));
       void persist('info', module, message, data);

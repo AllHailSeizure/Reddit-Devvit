@@ -124,7 +124,6 @@ Errors in one module never stop the others from running.
 
 ```typescript
 const log = logger('spam-filter');
-log.debug('checking post', { postId });
 log.info('removed post', { postId, reason: 'spam' });
 log.warn('rate limit approaching');
 log.error('reddit API call failed', err, { postId });
@@ -163,4 +162,80 @@ persisted to Redis under `bot:log:<level>` (capped at 500 entries) for future mo
 # Devvit Documentation Reference
 
 See DEVVIT_REFERENCE.md` for devvit.json schema, Hono routing, triggers, Redis patterns, and API client usage.
+
+# Playtesting
+
+See PLAYTEST_FEEDBACK.md for feedback of the most recent playtest, and PLAYTEST_ARCHIVE.md
+
+---
+
+# @devvit/web Architecture (v0.12.0) — Hard-Won Knowledge
+
+## How the server actually runs
+
+The Hono server does **not** run locally. The flow is:
+
+1. `npm run build` compiles `src/server/index.ts` → `dist/server/index.js` (esbuild CJS bundle)
+2. `devvit playtest` reads `dist/server/index.js` and embeds it inside the Devvit actor bundle
+3. The actor bundle is uploaded to Devvit's platform
+4. The platform runs the server in the cloud at `http://webbit.local:${WEBBIT_PORT}/`
+5. Menu item presses and trigger events are routed to the server by the platform
+
+Port 5678 / the VS Code devtunnel is the **PlaytestServer WebSocket** (live-reload only),
+not the HTTP server. It is only started with `devvit playtest --connect`. Without `--connect`
+it is never opened, which is normal and expected.
+
+## esbuild command — no `--external` flags
+
+The user's `package.json` build command must bundle **everything** with no `--external` flags:
+
+```json
+"build": "esbuild src/server/index.ts --bundle --platform=node --format=cjs --outfile=dist/server/index.js"
+```
+
+Why: The CLI's own esbuild only externalizes `@devvit/protos` root (exact match). If you mark
+packages like `@devvit/server`, `@devvit/reddit`, `@devvit/protos/json/...` as external, the
+sandbox eval fails at runtime with "Cannot find module" because the platform doesn't expose them.
+
+## Must use `createServer` from `@devvit/server`
+
+`src/server/index.ts` must use:
+```typescript
+import { createServer, getServerPort } from '@devvit/server';
+createServer(getRequestListener(app.fetch.bind(app))).listen(getServerPort());
+```
+
+NOT `serve()` from `@hono/node-server`. The `@devvit/server` version wraps `listen()` to be a
+no-op when `globalThis.enableWebbitBundlingHack` is true (set during bundle eval), preventing
+port binding during the CLI's bundling step.
+
+## How menu items work
+
+Menu items are declared in `devvit.json` under `menu.items`. The CLI's bundler injects these into
+`globalThis.__devvit__.config` (as a compile-time `define`). The template code (`blocks.template.js`)
+reads this and calls `Devvit.addMenuItem()` for each item.
+
+`forUserType` values:
+- `"moderator"` — only visible to subreddit moderators
+- `"user"` — visible to all logged-in users (maps to blank/unset in classic Devvit)
+
+`location` values: `"comment"`, `"post"`, `"subreddit"`
+
+Menu items appear in the comment/post overflow (three-dot) menu.
+
+## Playtest URL
+
+To use a playtest version, navigate to the subreddit with `?playtest=<app-slug>` in the URL:
+```
+https://www.reddit.com/r/llmphysics_dev/?playtest=llmphysics-bot
+```
+When clicking posts that open in a new tab, the parameter is lost — re-add it manually.
+Using `devvit playtest --connect` starts the WebSocket server and auto-adds `?playtest=` to
+the URL shown in the terminal.
+
+## `devvit.json` scripts
+
+The CLI only runs `scripts.dev` from `devvit.json` (not `scripts.build`). `scripts.dev` would be
+for starting auxiliary local processes (not needed for pure server apps — the server runs in cloud).
+`scripts.build` is never called by the CLI; you must run `npm run build` yourself before playtesting.
 

@@ -23,20 +23,25 @@ import type {
 
 // ─── Trigger module imports ────────────────────────────────────────────────────
 // Add one import line per new trigger module, e.g.:
-// import { run as spamFilter } from './modules/spam-filter';
+// import { run as spamFilter } from './action-modules/spam-filter';
+import { runOnComment, runOnPost } from './command';
+
+// ─── Command module imports ────────────────────────────────────────────────────
+// Add one import line per new command module (side-effect: registers the command), e.g.:
+// import './command-modules/score-command';
 
 // ─── Menu module imports ───────────────────────────────────────────────────────
 // Add one import line per new menu module, e.g.:
-// import { register as registerMyModule } from './modules/my-module';
-import { register as registerCommentModerator } from './modules/comment-moderator';
+// import { register as registerMyModule } from './action-modules/my-module';
+import { register as registerCommentModerator } from './action-modules/comment-moderator';
 
 // ─── Trigger arrays ────────────────────────────────────────────────────────────
 // Add the imported run() to the appropriate array (one line per module).
 
 const APP_INSTALL:    AppInstallHandler[]    = [];
 const APP_UPGRADE:    AppUpgradeHandler[]    = [];
-const POST_SUBMIT:    PostSubmitHandler[]    = [];
-const COMMENT_CREATE: CommentCreateHandler[] = [];
+const POST_SUBMIT:    PostSubmitHandler[]    = [runOnPost];
+const COMMENT_CREATE: CommentCreateHandler[] = [runOnComment];
 const POST_REPORT:    PostReportHandler[]    = [];
 const COMMENT_REPORT: CommentReportHandler[] = [];
 const MOD_ACTIONS:    ModActionsHandler[]    = [];

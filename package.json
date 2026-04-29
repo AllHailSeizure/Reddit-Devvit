@@ -3,7 +3,7 @@
   "version": "0.1.1",
   "private": true,
   "scripts": {
-    "build": "esbuild src/server/index.ts --bundle --platform=node --format=cjs --outfile=dist/server/index.js --external:@devvit/cache --external:@devvit/media --external:@devvit/metrics --external:@devvit/notifications --external:@devvit/payments --external:@devvit/protos --external:@devvit/public-api --external:@devvit/realtime --external:@devvit/reddit --external:@devvit/redis --external:@devvit/scheduler --external:@devvit/server --external:@devvit/settings --external:@devvit/shared --external:@devvit/shared-types --external:@devvit/splash",
+    "build": "esbuild src/server/index.ts --bundle --platform=node --format=cjs --outfile=dist/server/index.js",
     "dev": "devvit playtest r/llmphysics_dev"
   },
   "dependencies": {

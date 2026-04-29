@@ -24,14 +24,14 @@
       {
         "label": "Remove comment chain",
         "description": "Mod-remove this comment and all replies recursively",
-        "forUserType": "moderator",
+        "forUserType": "user",
         "location": "comment",
         "endpoint": "/internal/menu/remove-comment-chain"
       },
       {
         "label": "Lock comment chain",
         "description": "Lock this comment and all replies recursively",
-        "forUserType": "moderator",
+        "forUserType": "user",
         "location": "comment",
         "endpoint": "/internal/menu/lock-comment-chain"
       }
