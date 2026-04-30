@@ -1,0 +1,67 @@
+import { reddit, redis, settings } from '@devvit/web/server';
+import type { OnCommentCreateRequest } from '@devvit/web/shared';
+import { logger } from '../logger';
+
+const log = logger('chain-moderator');
+const CAP_LOG_KEY = 'bot:chainmod:depth-log';
+const MAX_LOG_ENTRIES = 200;
+
+type CommentId = `t1_${string}`;
+
+export async function run(event: OnCommentCreateRequest): Promise<void> {
+  const cv2 = event.comment;
+  if (!cv2) return;
+
+  const cap = (await settings.get<number>('depthCap')) ?? 10;
+  if (cap <= 0) return;
+
+  const signature = (await settings.get<string>('botSignature')) ?? '';
+  const noticeBody =
+    (await settings.get<string>('depthCapNotice')) ||
+    'This comment has reached the maximum comment depth and locked. The comment was submitted for review and if found to be productive will be unlocked.';
+  const notice = signature ? `${noticeBody}\n\n${signature}` : noticeBody;
+
+  // Fast exit: direct reply to post is depth 1
+  if (cv2.parentId.startsWith('t3_') && cap > 1) return;
+
+  // Walk up cap-1 times to determine exact depth, collecting the ancestor chain
+  const ancestors: Awaited<ReturnType<typeof reddit.getCommentById>>[] = [];
+  const deepest = await reddit.getCommentById(cv2.id as CommentId);
+  ancestors.push(deepest);
+
+  let current = deepest;
+  for (let i = 1; i < cap; i++) {
+    if (!current.parentId.startsWith('t1_')) return; // depth < cap
+    current = await reddit.getCommentById(current.parentId as CommentId);
+    ancestors.push(current);
+  }
+  if (!current.parentId.startsWith('t3_')) return; // depth > cap
+
+  // depth == cap — enforce
+  log.info('Depth cap reached', { commentId: cv2.id, cap });
+
+  // Reply before locking so the bot can post to an unlocked comment
+  try {
+    await deepest.reply({
+      text: notice,
+    });
+  } catch (err) {
+    log.warn('Could not leave depth cap notice', { error: (err as Error).message });
+  }
+
+  if (!deepest.locked) await deepest.lock();
+
+  // Walk up locking each ancestor while it has no other children (linear chain)
+  let childId: string = deepest.id;
+  for (let i = 1; i < ancestors.length; i++) {
+    const parent = ancestors[i];
+    const siblings = await parent.replies.all();
+    if (siblings.some(s => s.id !== childId)) break; // branch point — stop
+    if (!parent.locked) await parent.lock();
+    childId = parent.id;
+  }
+
+  const ts = Date.now();
+  await redis.zAdd(CAP_LOG_KEY, { score: ts, member: JSON.stringify({ ts, commentId: cv2.id, cap }) });
+  await redis.zRemRangeByRank(CAP_LOG_KEY, 0, -(MAX_LOG_ENTRIES + 1));
+}

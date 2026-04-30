@@ -3,7 +3,7 @@ import { reddit, redis } from '@devvit/web/server';
 import type { MenuItemRequest, UiResponse } from '@devvit/web/shared';
 import { logger } from '../logger';
 
-const log = logger('comment-moderator');
+const log = logger('chain-moderator');
 const CHAIN_LOG_KEY = 'bot:chainmod:log';
 const MAX_LOG_ENTRIES = 200;
 
@@ -60,7 +60,13 @@ async function removeChain(targetId: CommentId): Promise<string> {
 }
 
 async function lockSubtree(commentId: CommentId): Promise<number> {
-  const comment = await reddit.getCommentById(commentId);
+  let comment;
+  try {
+    comment = await reddit.getCommentById(commentId);
+  } catch (err) {
+    log.warn('Could not fetch comment, skipping', { id: commentId, error: (err as Error).message });
+    return 0;
+  }
   let count = 0;
   const replies = await comment.replies.all();
   for (const reply of replies) {

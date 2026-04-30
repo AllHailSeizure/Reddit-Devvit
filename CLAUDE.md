@@ -19,7 +19,7 @@ core dispatch or entry-point files.
 
 ```
 llmphysics-bot/
-├── devvit.json                    # App config: triggers, permissions, build script
+├── devvit.json                    # App config: triggers, settings, menu items, permissions
 ├── package.json
 ├── tsconfig.json
 ├── .gitignore
@@ -30,23 +30,25 @@ llmphysics-bot/
         ├── logger.ts              # Structured logger (level + module + timestamp)
         ├── types.ts               # Shared TypeScript types
         ├── registry.ts            # Module registry — THE file you edit to add a module
-        └── modules/
-            ├── app-install.ts     # Starter: runs on bot install/upgrade
-            ├── post-monitor.ts    # Starter: logs every new post submission
-            └── <future-module>.ts # Each new capability lives here
+        ├── trigger-modules/       # Activated by Reddit events (onCommentCreate, etc.)
+        │   ├── command.ts         # Command dispatcher (!command syntax)
+        │   └── depth-cap-moderator.ts  # Auto depth-cap enforcement
+        ├── action-modules/        # Activated by overflow menu item clicks
+        │   └── chain-moderator.ts # Lock / remove comment chain
+        └── command-modules/       # Activated by !commands via command.ts dispatcher
 ```
 
 ---
 
-## Module Pattern
+## Module Types
 
-Every module is a **self-contained `.ts` file** that:
-- Imports only what it needs (`reddit`, `redis`, `logger`, shared types)
-- Exports a single `run(event)` function typed to its trigger
-- Has zero knowledge of other modules
+Three kinds of modules, separated by what activates them:
+
+### 1. Trigger modules (`trigger-modules/`)
+Activated by Reddit platform events. Export a single `run(event)` function.
 
 ```typescript
-// src/server/modules/example-module.ts
+// src/server/trigger-modules/example-module.ts
 import { reddit } from '@devvit/web/server';
 import type { OnPostSubmitRequest } from '@devvit/web/shared';
 import { logger } from '../logger';
@@ -55,28 +57,53 @@ const log = logger('example-module');
 
 export async function run(event: OnPostSubmitRequest): Promise<void> {
   log.info('New post', { postId: event.post.id });
-  // ... module logic using reddit, redis, etc.
 }
+```
+
+Register in `registry.ts`:
+```typescript
+import { run as myModule } from './trigger-modules/my-module';
+const POST_SUBMIT: PostSubmitHandler[] = [myModule];
+```
+
+### 2. Action modules (`action-modules/`)
+Activated by overflow menu item clicks. Export a `register(app)` function that mounts Hono routes,
+and declare matching items in `devvit.json` under `menu.items`.
+
+### 3. Command modules (`command-modules/`)
+Activated by `!commandName` syntax in posts/comments, dispatched through `trigger-modules/command.ts`.
+Side-effect imports — calling `registerCommand()` at module scope is enough:
+
+```typescript
+// src/server/command-modules/my-command.ts
+import { registerCommand } from '../trigger-modules/command';
+
+registerCommand(
+  { commandName: 'foo', contentType: 'comment', requiresArgument: false },
+  async (event, arg) => { /* handler */ }
+);
+```
+
+Register in `registry.ts` with a side-effect import:
+```typescript
+import '../command-modules/my-command';
 ```
 
 ---
 
-## Adding a New Module (2 lines of code)
+## Adding a New Trigger Module (2 lines of code)
 
 Open `src/server/registry.ts` and add:
 
 ```typescript
 // Line 1 — import at the top
-import { run as myNewModule } from './modules/my-new-module';
+import { run as myNewModule } from './trigger-modules/my-new-module';
 
 // Line 2 — register under the right trigger array
-export const POST_SUBMIT = [postMonitor, myNewModule];
-//                                        ^^^^^^^^^^^^ added
+const POST_SUBMIT: PostSubmitHandler[] = [myNewModule];
 ```
 
-That's it. `index.ts` and `devvit.json` do **not** need to change when adding a module to an
-existing trigger type. (Adding a brand-new trigger type requires one new route in `index.ts` and
-one new entry in `devvit.json`, but that's a rare, one-time change per trigger.)
+`index.ts` and `devvit.json` do **not** need to change for an existing trigger type.
 
 ---
 
@@ -136,17 +163,25 @@ persisted to Redis under `bot:log:<level>` (capped at 500 entries) for future mo
 
 ---
 
+## Current Modules
+
+| File | Type | Trigger | Purpose |
+|------|------|---------|---------|
+| `trigger-modules/command.ts` | trigger | `onCommentCreate`, `onPostSubmit` | `!command` dispatcher |
+| `trigger-modules/depth-cap-moderator.ts` | trigger | `onCommentCreate` | Auto depth-cap enforcement |
+| `action-modules/chain-moderator.ts` | action | menu click | Lock / remove comment chain |
+
 ## Planned Modules (Future)
 
-| Module                  | Trigger              | Purpose                                      |
-|-------------------------|----------------------|----------------------------------------------|
-| `rule-enforcer.ts`      | `onPostSubmit`       | Auto-remove posts violating subreddit rules  |
-| `flair-required.ts`     | `onPostSubmit`       | Remove unflaired posts after grace period    |
-| `spam-filter.ts`        | `onPostSubmit`       | Heuristic / LLM-assisted spam detection      |
-| `comment-filter.ts`     | `onCommentCreate`    | Filter low-effort or rule-breaking comments  |
-| `report-handler.ts`     | `onPostReport`       | Triage reported posts, notify mods           |
-| `mod-log.ts`            | `onModActions`       | Mirror mod actions to a structured log       |
-| `scheduled-cleanup.ts`  | scheduler (cron)     | Periodic housekeeping tasks                  |
+| Module                  | Type    | Trigger              | Purpose                                      |
+|-------------------------|---------|----------------------|----------------------------------------------|
+| `rule-enforcer.ts`      | trigger | `onPostSubmit`       | Auto-remove posts violating subreddit rules  |
+| `flair-required.ts`     | trigger | `onPostSubmit`       | Remove unflaired posts after grace period    |
+| `spam-filter.ts`        | trigger | `onPostSubmit`       | Heuristic / LLM-assisted spam detection      |
+| `comment-filter.ts`     | trigger | `onCommentCreate`    | Filter low-effort or rule-breaking comments  |
+| `report-handler.ts`     | trigger | `onPostReport`       | Triage reported posts, notify mods           |
+| `mod-log.ts`            | trigger | `onModActions`       | Mirror mod actions to a structured log       |
+| `scheduled-cleanup.ts`  | trigger | scheduler (cron)     | Periodic housekeeping tasks                  |
 
 ---
 

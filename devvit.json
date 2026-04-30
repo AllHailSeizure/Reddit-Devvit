@@ -23,19 +23,41 @@
     "items": [
       {
         "label": "Remove comment chain",
-        "description": "Mod-remove this comment and all replies recursively",
-        "forUserType": "user",
+        "description": "Remove this comment and all replies recursively",
+        "forUserType": "moderator",
         "location": "comment",
         "endpoint": "/internal/menu/remove-comment-chain"
       },
       {
         "label": "Lock comment chain",
         "description": "Lock this comment and all replies recursively",
-        "forUserType": "user",
+        "forUserType": "moderator",
         "location": "comment",
         "endpoint": "/internal/menu/lock-comment-chain"
       }
     ]
+  },
+  "settings": {
+    "subreddit": {
+      "botSignature": {
+        "type": "paragraph",
+        "label": "General — Bot signature",
+        "helpText": "Appended to all bot comments. Leave blank for no signature.",
+        "defaultValue": "^I ^am ^a ^bot. ^This ^action ^was ^performed ^automatically. ^Contact ^the ^moderators ^if ^you ^have ^questions."
+      },
+      "depthCap": {
+        "type": "number",
+        "label": "Chain Moderation — Maximum comment chain depth",
+        "helpText": "Lock comment chains that reach this depth. Set to 0 to disable. Default: 10.",
+        "defaultValue": 10
+      },
+      "depthCapNotice": {
+        "type": "paragraph",
+        "label": "Chain Moderation — Depth cap notice",
+        "helpText": "Message the bot posts when a comment hits the depth cap.",
+        "defaultValue": "This comment has reached the maximum comment depth and locked. The comment was submitted for review and if found to be productive will be unlocked."
+      }
+    }
   },
   "scripts": {
     "build": "npm run build"

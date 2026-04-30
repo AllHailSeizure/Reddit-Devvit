@@ -24,7 +24,7 @@ import type {
 // ─── Trigger module imports ────────────────────────────────────────────────────
 // Add one import line per new trigger module, e.g.:
 // import { run as spamFilter } from './action-modules/spam-filter';
-import { runOnComment, runOnPost } from './command';
+import { runOnComment, runOnPost } from './trigger-modules/command';
 
 // ─── Command module imports ────────────────────────────────────────────────────
 // Add one import line per new command module (side-effect: registers the command), e.g.:
@@ -33,7 +33,8 @@ import { runOnComment, runOnPost } from './command';
 // ─── Menu module imports ───────────────────────────────────────────────────────
 // Add one import line per new menu module, e.g.:
 // import { register as registerMyModule } from './action-modules/my-module';
-import { register as registerCommentModerator } from './action-modules/comment-moderator';
+import { register as registerChainModerator } from './action-modules/chain-moderator';
+import { run as runDepthCapModerator } from './trigger-modules/depth-cap-moderator';
 
 // ─── Trigger arrays ────────────────────────────────────────────────────────────
 // Add the imported run() to the appropriate array (one line per module).
@@ -41,7 +42,7 @@ import { register as registerCommentModerator } from './action-modules/comment-m
 const APP_INSTALL:    AppInstallHandler[]    = [];
 const APP_UPGRADE:    AppUpgradeHandler[]    = [];
 const POST_SUBMIT:    PostSubmitHandler[]    = [runOnPost];
-const COMMENT_CREATE: CommentCreateHandler[] = [runOnComment];
+const COMMENT_CREATE: CommentCreateHandler[] = [runOnComment, runDepthCapModerator];
 const POST_REPORT:    PostReportHandler[]    = [];
 const COMMENT_REPORT: CommentReportHandler[] = [];
 const MOD_ACTIONS:    ModActionsHandler[]    = [];
@@ -100,5 +101,5 @@ export function registerAll(app: Hono): void {
   });
 
   // Menu modules — add one line per new menu module
-  registerCommentModerator(app);
+  registerChainModerator(app);
 }
