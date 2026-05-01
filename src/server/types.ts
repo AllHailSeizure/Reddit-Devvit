@@ -35,3 +35,8 @@ export interface RegisteredCommand {
   definition: CommandDefinition;
   handler: CommandHandler;
 }
+
+// ─── Reddit ID branded types ───────────────────────────────────────────────────
+
+export type CommentId = `t1_${string}`;
+export type PostId    = `t3_${string}`;

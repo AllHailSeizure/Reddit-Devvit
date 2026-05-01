@@ -1,13 +1,12 @@
 import type { Hono } from 'hono';
-import { reddit, redis } from '@devvit/web/server';
+import { reddit } from '@devvit/web/server';
 import type { MenuItemRequest, UiResponse } from '@devvit/web/shared';
-import { logger } from '../logger';
+import { logger, logZSet } from '../logger';
+import type { CommentId } from '../types';
 
 const log = logger('chain-moderator');
 const CHAIN_LOG_KEY = 'bot:chainmod:log';
-const MAX_LOG_ENTRIES = 200;
-
-type CommentId = `t1_${string}`;
+const CHAIN_LOG_MAX = 200;
 
 async function collectSubtree(commentId: CommentId): Promise<CommentId[]> {
   const comment = await reddit.getCommentById(commentId);
@@ -19,12 +18,6 @@ async function collectSubtree(commentId: CommentId): Promise<CommentId[]> {
   }
   ids.push(commentId); // post-order: deepest children first
   return ids;
-}
-
-async function logAction(entry: object): Promise<void> {
-  const ts = Date.now();
-  await redis.zAdd(CHAIN_LOG_KEY, { score: ts, member: JSON.stringify({ ts, ...entry }) });
-  await redis.zRemRangeByRank(CHAIN_LOG_KEY, 0, -(MAX_LOG_ENTRIES + 1));
 }
 
 async function removeChain(targetId: CommentId): Promise<string> {
@@ -54,7 +47,7 @@ async function removeChain(targetId: CommentId): Promise<string> {
     log.warn('Could not add removal note', { error: (err as Error).message });
   }
 
-  await logAction({ action: 'remove_chain', targetId, by: mod, count: removed });
+  await logZSet(CHAIN_LOG_KEY, { action: 'remove_chain', targetId, by: mod, count: removed }, CHAIN_LOG_MAX);
   log.info('Chain removed', { targetId, count: removed, by: mod });
   return `Removed ${removed} comment${removed !== 1 ? 's' : ''}.`;
 }
@@ -85,7 +78,7 @@ async function lockChain(targetId: CommentId): Promise<string> {
 
   const locked = await lockSubtree(targetId);
 
-  await logAction({ action: 'lock_chain', targetId, by: mod, count: locked });
+  await logZSet(CHAIN_LOG_KEY, { action: 'lock_chain', targetId, by: mod, count: locked }, CHAIN_LOG_MAX);
   log.info('Chain locked', { targetId, count: locked, by: mod });
   return `Locked ${locked} comment${locked !== 1 ? 's' : ''}.`;
 }

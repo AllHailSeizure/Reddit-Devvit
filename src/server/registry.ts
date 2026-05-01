@@ -1,14 +1,5 @@
 import type { Hono } from 'hono';
-import type {
-  OnAppInstallRequest,
-  OnAppUpgradeRequest,
-  OnPostSubmitRequest,
-  OnCommentCreateRequest,
-  OnPostReportRequest,
-  OnCommentReportRequest,
-  OnModActionRequest,
-  TriggerResponse,
-} from '@devvit/web/shared';
+import type { TriggerResponse } from '@devvit/web/shared';
 import { logger } from './logger';
 import type {
   AppInstallHandler,
@@ -65,42 +56,26 @@ async function dispatch<T>(trigger: string, modules: ModuleHandler<T>[], event: 
 
 // ─── registerAll ──────────────────────────────────────────────────────────────
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AnyHandler = ModuleHandler<any>;
+
+const TRIGGER_ROUTES: Array<[string, AnyHandler[]]> = [
+  ['app-install',    APP_INSTALL],
+  ['app-upgrade',    APP_UPGRADE],
+  ['post-submit',    POST_SUBMIT],
+  ['comment-create', COMMENT_CREATE],
+  ['post-report',    POST_REPORT],
+  ['comment-report', COMMENT_REPORT],
+  ['mod-action',     MOD_ACTIONS],
+];
+
 export function registerAll(app: Hono): void {
-  // Trigger routes
-  app.post('/internal/triggers/app-install', async (c) => {
-    await dispatch('app-install', APP_INSTALL, await c.req.json<OnAppInstallRequest>());
-    return c.json<TriggerResponse>({ status: 'ok' });
-  });
-
-  app.post('/internal/triggers/app-upgrade', async (c) => {
-    await dispatch('app-upgrade', APP_UPGRADE, await c.req.json<OnAppUpgradeRequest>());
-    return c.json<TriggerResponse>({ status: 'ok' });
-  });
-
-  app.post('/internal/triggers/post-submit', async (c) => {
-    await dispatch('post-submit', POST_SUBMIT, await c.req.json<OnPostSubmitRequest>());
-    return c.json<TriggerResponse>({ status: 'ok' });
-  });
-
-  app.post('/internal/triggers/comment-create', async (c) => {
-    await dispatch('comment-create', COMMENT_CREATE, await c.req.json<OnCommentCreateRequest>());
-    return c.json<TriggerResponse>({ status: 'ok' });
-  });
-
-  app.post('/internal/triggers/post-report', async (c) => {
-    await dispatch('post-report', POST_REPORT, await c.req.json<OnPostReportRequest>());
-    return c.json<TriggerResponse>({ status: 'ok' });
-  });
-
-  app.post('/internal/triggers/comment-report', async (c) => {
-    await dispatch('comment-report', COMMENT_REPORT, await c.req.json<OnCommentReportRequest>());
-    return c.json<TriggerResponse>({ status: 'ok' });
-  });
-
-  app.post('/internal/triggers/mod-action', async (c) => {
-    await dispatch('mod-action', MOD_ACTIONS, await c.req.json<OnModActionRequest>());
-    return c.json<TriggerResponse>({ status: 'ok' });
-  });
+  for (const [slug, modules] of TRIGGER_ROUTES) {
+    app.post(`/internal/triggers/${slug}`, async (c) => {
+      await dispatch(slug, modules, await c.req.json());
+      return c.json<TriggerResponse>({ status: 'ok' });
+    });
+  }
 
   // Menu modules — add one line per new menu module
   registerChainModerator(app);

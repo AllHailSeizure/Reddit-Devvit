@@ -1,12 +1,11 @@
-import { reddit, redis, settings } from '@devvit/web/server';
+import { reddit, settings } from '@devvit/web/server';
 import type { OnCommentCreateRequest } from '@devvit/web/shared';
-import { logger } from '../logger';
+import { logger, logZSet } from '../logger';
+import type { CommentId } from '../types';
 
-const log = logger('chain-moderator');
+const log = logger('depth-cap-moderator');
 const CAP_LOG_KEY = 'bot:chainmod:depth-log';
-const MAX_LOG_ENTRIES = 200;
-
-type CommentId = `t1_${string}`;
+const CAP_LOG_MAX = 200;
 
 export async function run(event: OnCommentCreateRequest): Promise<void> {
   const cv2 = event.comment;
@@ -61,7 +60,5 @@ export async function run(event: OnCommentCreateRequest): Promise<void> {
     childId = parent.id;
   }
 
-  const ts = Date.now();
-  await redis.zAdd(CAP_LOG_KEY, { score: ts, member: JSON.stringify({ ts, commentId: cv2.id, cap }) });
-  await redis.zRemRangeByRank(CAP_LOG_KEY, 0, -(MAX_LOG_ENTRIES + 1));
+  await logZSet(CAP_LOG_KEY, { commentId: cv2.id, cap }, CAP_LOG_MAX);
 }

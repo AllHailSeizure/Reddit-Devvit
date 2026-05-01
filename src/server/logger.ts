@@ -21,6 +21,17 @@ async function persist(level: LogLevel, module: string, message: string, extra?:
   }
 }
 
+export async function logZSet(key: string, entry: object, maxEntries = MAX_LOG_ENTRIES): Promise<void> {
+  try {
+    const { redis } = await import('@devvit/web/server');
+    const ts = Date.now();
+    await redis.zAdd(key, { score: ts, member: JSON.stringify({ ts, ...entry }) });
+    await redis.zRemRangeByRank(key, 0, -(maxEntries + 1));
+  } catch {
+    // never let logging break the bot
+  }
+}
+
 export function logger(module: string) {
   return {
     info(message: string, data?: unknown): void {
