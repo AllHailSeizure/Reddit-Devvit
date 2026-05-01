@@ -20,7 +20,7 @@ export function registerCommand(definition: CommandDefinition, handler: CommandH
 }
 
 const BOT_MENTION = 'u/LLMPhysics-bot';
-const COMMAND_PATTERN = /!(\w+)(?:\s+\[([^\]]+)\])?/g;
+const COMMAND_PATTERN = /!(\w+)(?:\s+\\?\[([^\]]+)\\?\])?/g;
 
 async function parseAndDispatch(
   body: string,
@@ -32,7 +32,8 @@ async function parseAndDispatch(
   const matches = [...body.matchAll(COMMAND_PATTERN)];
   if (matches.length === 0) return;
 
-  for (const [, commandName, argument] of matches) {
+  for (const [, commandName, rawArgument] of matches) {
+    const argument = rawArgument?.replace(/^[^a-zA-Z0-9()]+|[^a-zA-Z0-9()]+$/g, '');
     const registered = commands.get(commandName);
     if (!registered) {
       const argPart = argument ? `, Argument: [${argument}]` : '';

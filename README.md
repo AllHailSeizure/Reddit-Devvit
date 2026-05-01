@@ -2,7 +2,7 @@
 
 > A modular Reddit moderation-assistance bot for [r/LLMPhysics](https://reddit.com/r/LLMPhysics), built on the [Devvit](https://developers.reddit.com/docs) platform.
 
-**Version:** 1.0.3
+**Version:** 1.1.0
 **Platform:** @devvit/web v0.12+  
 **Subreddit:** r/LLMPhysics
 

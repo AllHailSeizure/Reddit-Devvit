@@ -29,6 +29,7 @@ import { runOnComment, runOnPost } from './trigger-modules/command';
 // ─── Command module imports ────────────────────────────────────────────────────
 // Add one import line per new command module (side-effect: registers the command), e.g.:
 // import './command-modules/score-command';
+import './command-modules/define';
 
 // ─── Menu module imports ───────────────────────────────────────────────────────
 // Add one import line per new menu module, e.g.:
