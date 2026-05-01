@@ -25,6 +25,7 @@ import type {
 // Add one import line per new trigger module, e.g.:
 // import { run as spamFilter } from './action-modules/spam-filter';
 import { runOnComment, runOnPost } from './trigger-modules/command';
+import { runOnCommentReport, runOnPostReport } from './trigger-modules/report-filter';
 
 // ─── Command module imports ────────────────────────────────────────────────────
 // Add one import line per new command module (side-effect: registers the command), e.g.:
@@ -44,8 +45,8 @@ const APP_INSTALL:    AppInstallHandler[]    = [];
 const APP_UPGRADE:    AppUpgradeHandler[]    = [];
 const POST_SUBMIT:    PostSubmitHandler[]    = [runOnPost];
 const COMMENT_CREATE: CommentCreateHandler[] = [runOnComment, runDepthCapModerator];
-const POST_REPORT:    PostReportHandler[]    = [];
-const COMMENT_REPORT: CommentReportHandler[] = [];
+const POST_REPORT:    PostReportHandler[]    = [runOnPostReport];
+const COMMENT_REPORT: CommentReportHandler[] = [runOnCommentReport];
 const MOD_ACTIONS:    ModActionsHandler[]    = [];
 
 // ─── Dispatch ──────────────────────────────────────────────────────────────────
