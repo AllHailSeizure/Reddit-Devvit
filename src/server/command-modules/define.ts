@@ -1,8 +1,7 @@
-import { reddit } from '@devvit/web/server';
+import { reddit, settings } from '@devvit/web/server';
 import { logger } from '../logger';
 import { registerCommand } from '../trigger-modules/command';
 import type { CommandEvent } from '../types';
-import categoryScores from './category-scores.json';
 
 const log = logger('define');
 
@@ -10,106 +9,73 @@ const WIKI_API = 'https://en.wikipedia.org/w/api.php';
 const WIKI_ARTICLE_BASE = 'https://en.wikipedia.org/wiki/';
 const USER_AGENT = 'llmphysics-bot/1.0 (Reddit bot; r/llmphysics)';
 const EXTRACT_MAX_CHARS = 600;
+const GEMINI_API = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-
-type WikiSearchResult = {
-  pageid: number;
-  title: string;
-  snippet: string;
-};
 
 type WikiPage = {
   pageid: number;
   title: string;
   extract: string;
-  categories: string[];
 };
 
-type WikiSuggestion = {
-  title: string;
-  url: string;
-};
+// ─── Groq term resolver ───────────────────────────────────────────────────────
 
-// ─── API functions ────────────────────────────────────────────────────────────
+async function geminiResolve(term: string, apiKey: string): Promise<string | null> {
+  const prompt =
+    `You are a Wikipedia title resolver for a physics/mathematics/AI subreddit.\n` +
+    `Given a user's search term, return the exact Wikipedia article title for the physics, ` +
+    `mathematics, or artificial intelligence concept they're asking about. Correct any spelling ` +
+    `errors and use proper Wikipedia title formatting (e.g. diacritics, capitalisation).\n` +
+    `If the term is not a physics, mathematics, or AI concept, reply with exactly "none".\n` +
+    `Reply with only the Wikipedia article title or "none" — nothing else.\n\n` +
+    `Term: ${term}`;
 
-async function searchWikipedia(term: string): Promise<WikiSearchResult[]> {
-  const params = new URLSearchParams({
-    action: 'query',
-    list: 'search',
-    srsearch: term,
-    srlimit: '10',
-    format: 'json',
-    origin: '*',
+  const res = await fetch(GEMINI_API, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
+    body: JSON.stringify({
+      contents: [{ parts: [{ text: prompt }] }],
+      generationConfig: { maxOutputTokens: 30, temperature: 0 },
+    }),
   });
-  const res = await fetch(`${WIKI_API}?${params}`, {
-    headers: { 'User-Agent': USER_AGENT },
-  });
-  if (!res.ok) throw new Error(`Wikipedia search failed: ${res.status}`);
-  const data = await res.json() as { query: { search: WikiSearchResult[] } };
-  return data.query.search ?? [];
+
+  if (!res.ok) throw new Error(`Gemini API ${res.status}`);
+  const data = await res.json() as { candidates: Array<{ content: { parts: Array<{ text: string }> } }> };
+  const result = (data.candidates[0]?.content.parts[0]?.text ?? '').trim();
+  return result.toLowerCase() === 'none' || result === '' ? null : result;
 }
 
-async function fetchPages(pageIds: number[]): Promise<WikiPage[]> {
+// ─── Wikipedia API ────────────────────────────────────────────────────────────
+
+async function fetchPageByTitle(title: string): Promise<WikiPage | null> {
   const params = new URLSearchParams({
     action: 'query',
-    pageids: pageIds.join('|'),
-    prop: 'extracts|categories',
+    titles: title,
+    prop: 'extracts',
     exintro: 'true',
     explaintext: 'true',
-    cllimit: '50',
+    redirects: '1',
     format: 'json',
     origin: '*',
   });
   const res = await fetch(`${WIKI_API}?${params}`, {
     headers: { 'User-Agent': USER_AGENT },
   });
-  if (!res.ok) throw new Error(`Wikipedia page fetch failed: ${res.status}`);
+  if (!res.ok) throw new Error(`Wikipedia fetch failed: ${res.status}`);
   const data = await res.json() as {
     query: {
       pages: Record<string, {
         pageid: number;
         title: string;
         extract?: string;
-        categories?: Array<{ title: string }>;
+        missing?: string;
       }>;
     };
   };
-  return Object.values(data.query.pages).map(p => ({
-    pageid: p.pageid,
-    title: p.title,
-    extract: p.extract ?? '',
-    categories: (p.categories ?? []).map(c => c.title),
-  }));
-}
-
-async function suggestTerms(term: string): Promise<WikiSuggestion[]> {
-  const params = new URLSearchParams({
-    action: 'opensearch',
-    search: term,
-    limit: '3',
-    format: 'json',
-    origin: '*',
-  });
-  const res = await fetch(`${WIKI_API}?${params}`, {
-    headers: { 'User-Agent': USER_AGENT },
-  });
-  if (!res.ok) throw new Error(`Wikipedia opensearch failed: ${res.status}`);
-  const [, titles, , urls] = await res.json() as [string, string[], string[], string[]];
-  return (titles ?? []).map((title, i) => ({ title, url: urls[i] ?? `${WIKI_ARTICLE_BASE}${encodeURIComponent(title)}` }));
-}
-
-// ─── Scoring ──────────────────────────────────────────────────────────────────
-
-const SCORE_THRESHOLD = 1;
-const scores = categoryScores as Record<string, { score: number; depth: number }>;
-
-function pageScore(page: WikiPage): number {
-  return Math.max(0, ...page.categories.map(c => scores[c]?.score ?? 0));
-}
-
-function passesThreshold(page: WikiPage): boolean {
-  return pageScore(page) >= SCORE_THRESHOLD;
+  const page = Object.values(data.query.pages)[0];
+  if (!page || 'missing' in page) return null;
+  return { pageid: page.pageid, title: page.title, extract: page.extract ?? '' };
 }
 
 // ─── Reply helpers ────────────────────────────────────────────────────────────
@@ -127,24 +93,6 @@ function truncate(text: string): string {
     : cut.trimEnd() + '…';
 }
 
-function replyHighConfidence(page: WikiPage): string {
-  return `**${page.title}**\n[Wikipedia](${articleUrl(page.title)})\n\n${truncate(page.extract)}`;
-}
-
-function replyLowConfidence(term: string, candidates: WikiPage[]): string {
-  const links = candidates
-    .slice(0, 3)
-    .map(p => `- [${p.title}](${articleUrl(p.title)})`)
-    .join('\n');
-  return `No clear physics/math/AI article found for "${term}". Top results:\n${links}`;
-}
-
-function replyNoResults(term: string, suggestions: WikiSuggestion[]): string {
-  if (suggestions.length === 0) return `No Wikipedia results found for "${term}".`;
-  const links = suggestions.map(s => `- [${s.title}](${s.url})`).join('\n');
-  return `No Wikipedia results found for "${term}". Did you mean:\n${links}`;
-}
-
 // ─── Command handler ──────────────────────────────────────────────────────────
 
 registerCommand(
@@ -156,36 +104,29 @@ registerCommand(
 
     log.info('Looking up definition', { term });
 
+    const apiKey = (await settings.get<string>('geminiApiKey')) || undefined;
+    if (!apiKey) {
+      log.warn('Groq API key not configured');
+      return;
+    }
+
     let replyText: string;
     try {
-      const searchResults = await searchWikipedia(term);
+      const canonicalTitle = await geminiResolve(term, apiKey);
+      log.info('Groq resolved term', { term, canonicalTitle });
 
-      if (searchResults.length === 0) {
-        const suggestions = await suggestTerms(term);
-        replyText = replyNoResults(term, suggestions);
+      if (!canonicalTitle) {
+        replyText = `"${term}" doesn't appear to be a physics, mathematics, or AI concept.`;
       } else {
-        const top = searchResults.slice(0, 5);
-        const pages = await fetchPages(top.map(c => c.pageid));
-
-        // Preserve search-rank order (Wikipedia's own relevance) for each page
-        const rankOf = new Map(top.map((r, i) => [r.pageid, i]));
-        const byRank = (a: WikiPage, b: WikiPage) =>
-          (rankOf.get(a.pageid) ?? 99) - (rankOf.get(b.pageid) ?? 99);
-
-        // 1. Exact title match that passes threshold → return full definition
-        const exact = pages.find(p => p.title.toLowerCase() === term.toLowerCase());
-        if (exact && passesThreshold(exact)) {
-          replyText = replyHighConfidence(exact);
+        const page = await fetchPageByTitle(canonicalTitle);
+        if (page) {
+          replyText = `**${page.title}**\n[Wikipedia](${articleUrl(page.title)})\n\n${truncate(page.extract)}`;
         } else {
-          // 2. Similar terms that pass threshold, ordered by search rank
-          const passing = pages.filter(passesThreshold).sort(byRank);
-          replyText = passing.length > 0
-            ? replyLowConfidence(term, passing.slice(0, 3))
-            : replyNoResults(term, await suggestTerms(term));
+          replyText = `Couldn't find a Wikipedia article for "${canonicalTitle}".`;
         }
       }
     } catch (err) {
-      log.error('Wikipedia API error', err, { term });
+      log.error('Define command error', err, { term });
       replyText = `Failed to look up "${term}" — please try again later.`;
     }
 

@@ -173,8 +173,12 @@ async function main() {
     process.exit(0);
   }
 
+  // Always include the root category itself at depth 0
+  const rootEntry = { [rootCategory]: { score: Math.max(...rootsWithScores.map(r => r.score)), depth: 0 } };
+
   console.log(`\nTraversing ${rootsWithScores.length} scored subcategories to depth ${args.depth}...`);
   const newEntries = await traverse(rootsWithScores, args.depth);
+  Object.assign(newEntries, rootEntry);
 
   let existing = {};
   if (!args.overwrite && existsSync(outputPath)) {

@@ -5,6 +5,9 @@
     "entry": "index.js"
   },
   "permissions": {
+    "http": {
+      "domains": ["en.wikipedia.org", "generativelanguage.googleapis.com"]
+    },
     "redis": true,
     "reddit": {
       "enable": true
@@ -38,6 +41,14 @@
     ]
   },
   "settings": {
+    "global": {
+      "geminiApiKey": {
+        "type": "string",
+        "label": "Gemini API key",
+        "helpText": "Google Gemini API key used by the !define command for term resolution.",
+        "isSecret": true
+      }
+    },
     "subreddit": {
       "botSignature": {
         "type": "paragraph",
