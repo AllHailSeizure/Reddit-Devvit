@@ -2,7 +2,7 @@
 
 > A modular Reddit moderation-assistance bot for [r/LLMPhysics](https://reddit.com/r/LLMPhysics), built on the [Devvit](https://developers.reddit.com/docs) platform.
 
-**Version:** 1.3.4
+**Version:** 1.4.3
 **Platform:** @devvit/web v0.12.22+  
 **Subreddit:** r/LLMPhysics
 
@@ -385,5 +385,9 @@ When clicking posts that open in a new tab, the `?playtest=` parameter is lost â
 ---
 
 Created by u/AllHailSeizure for r/LLMPhysics.
+
+
+
+
 
 

@@ -27,7 +27,9 @@ import './command-modules/define';
 // Add one import line per new menu module, e.g.:
 // import { register as registerMyModule } from './action-modules/my-module';
 import { register as registerChainModerator } from './action-modules/chain-moderator';
+import { register as registerSavedResponses } from './action-modules/saved-responses';
 import { run as runDepthCapModerator } from './trigger-modules/depth-cap-moderator';
+import { run as runSelfResponseModerator } from './trigger-modules/self-response-moderator';
 
 // ─── Trigger arrays ────────────────────────────────────────────────────────────
 // Add the imported run() to the appropriate array (one line per module).
@@ -35,7 +37,7 @@ import { run as runDepthCapModerator } from './trigger-modules/depth-cap-moderat
 const APP_INSTALL:    AppInstallHandler[]    = [];
 const APP_UPGRADE:    AppUpgradeHandler[]    = [];
 const POST_SUBMIT:    PostSubmitHandler[]    = [runOnPost];
-const COMMENT_CREATE: CommentCreateHandler[] = [runOnComment, runDepthCapModerator];
+const COMMENT_CREATE: CommentCreateHandler[] = [runOnComment, runDepthCapModerator, runSelfResponseModerator];
 const POST_REPORT:    PostReportHandler[]    = [runOnPostReport];
 const COMMENT_REPORT: CommentReportHandler[] = [runOnCommentReport];
 const MOD_ACTIONS:    ModActionsHandler[]    = [];
@@ -79,4 +81,5 @@ export function registerAll(app: Hono): void {
 
   // Menu modules — add one line per new menu module
   registerChainModerator(app);
+  registerSavedResponses(app);
 }

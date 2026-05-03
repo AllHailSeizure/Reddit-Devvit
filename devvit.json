@@ -37,8 +37,48 @@
         "forUserType": "moderator",
         "location": "comment",
         "endpoint": "/internal/menu/lock-comment-chain"
+      },
+      {
+        "label": "Apply saved response",
+        "description": "Post a saved general response to this content",
+        "forUserType": "moderator",
+        "location": ["comment", "post"],
+        "endpoint": "/internal/menu/apply-saved-response",
+        "postFilter": "none"
+      },
+      {
+        "label": "Add saved response",
+        "description": "Create a new saved general response",
+        "forUserType": "moderator",
+        "location": "subreddit",
+        "endpoint": "/internal/menu/add-saved-response",
+        "postFilter": "none"
+      },
+      {
+        "label": "Edit saved response",
+        "description": "Edit an existing saved general response",
+        "forUserType": "moderator",
+        "location": "subreddit",
+        "endpoint": "/internal/menu/edit-saved-response",
+        "postFilter": "none"
+      },
+      {
+        "label": "Delete saved response",
+        "description": "Delete a saved general response",
+        "forUserType": "moderator",
+        "location": "subreddit",
+        "endpoint": "/internal/menu/delete-saved-response",
+        "postFilter": "none"
       }
     ]
+  },
+  "forms": {
+    "saved-response-select":      "/internal/forms/saved-response/step2",
+    "saved-response-apply":       "/internal/forms/saved-response/apply",
+    "saved-response-add":         "/internal/forms/saved-response/add",
+    "saved-response-edit-select": "/internal/forms/saved-response/edit-select",
+    "saved-response-edit-apply":  "/internal/forms/saved-response/edit-apply",
+    "saved-response-delete":      "/internal/forms/saved-response/delete"
   },
   "settings": {
     "global": {
