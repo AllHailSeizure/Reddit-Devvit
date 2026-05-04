@@ -1,6 +1,7 @@
-import { reddit, settings } from '@devvit/web/server';
+import { reddit } from '@devvit/web/server';
 import type { OnCommentCreateRequest } from '@devvit/web/shared';
 import { logger, logZSet } from '../logger';
+import { readSetting } from '../app-settings';
 import type { CommentId } from '../types';
 
 const log = logger('depth-cap-moderator');
@@ -11,13 +12,14 @@ export async function run(event: OnCommentCreateRequest): Promise<void> {
   const cv2 = event.comment;
   if (!cv2) return;
 
-  const cap = (await settings.get<number>('depthCap')) ?? 10;
+  const cap = await readSetting('depthCap', 10);
   if (cap <= 0) return;
 
-  const signature = (await settings.get<string>('botSignature')) ?? '';
-  const noticeBody =
-    (await settings.get<string>('depthCapNotice')) ||
-    'This comment has reached the maximum comment depth and locked. The comment was submitted for review and if found to be productive will be unlocked.';
+  const signature = await readSetting('botSignature', '');
+  const noticeBody = await readSetting(
+    'depthCapNotice',
+    'This comment has reached the maximum comment depth and locked. The comment was submitted for review and if found to be productive will be unlocked.',
+  );
   const notice = signature ? `${noticeBody}\n\n${signature}` : noticeBody;
 
   // Fast exit: direct reply to post is depth 1

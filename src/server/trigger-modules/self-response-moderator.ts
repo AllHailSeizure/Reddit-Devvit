@@ -12,7 +12,8 @@ export async function run(event: OnCommentCreateRequest): Promise<void> {
   const post = event.post;
   if (!cv2 || !post) return;
   if (!cv2.parentId.startsWith('t3_')) return; // not a top-level comment
-  if (cv2.author !== post.author) return;       // top-level, but not OP
+  const commentAuthorId = event.author?.id;
+  if (!commentAuthorId || commentAuthorId !== post.authorId) return; // top-level, but not OP
 
   log.info('OP top-level comment — removing and locking', { commentId: cv2.id, postId: post.id });
 

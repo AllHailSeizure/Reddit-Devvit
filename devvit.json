@@ -20,7 +20,8 @@
     "onCommentCreate": "/internal/triggers/comment-create",
     "onPostReport": "/internal/triggers/post-report",
     "onCommentReport": "/internal/triggers/comment-report",
-    "onModAction": "/internal/triggers/mod-action"
+    "onModAction": "/internal/triggers/mod-action",
+    "onModMail": "/internal/triggers/mod-mail"
   },
   "menu": {
     "items": [
@@ -47,32 +48,24 @@
         "postFilter": "none"
       },
       {
-        "label": "Add saved response",
-        "description": "Create a new saved general response",
+        "label": "Saved responses",
+        "description": "Add, edit, or delete saved general responses",
         "forUserType": "moderator",
         "location": "subreddit",
-        "endpoint": "/internal/menu/add-saved-response",
+        "endpoint": "/internal/menu/saved-responses",
         "postFilter": "none"
       },
       {
-        "label": "Edit saved response",
-        "description": "Edit an existing saved general response",
+        "label": "Open Admin Panel",
+        "description": "Open the mod dashboard (settings, saved responses, appeals, logs)",
         "forUserType": "moderator",
         "location": "subreddit",
-        "endpoint": "/internal/menu/edit-saved-response",
-        "postFilter": "none"
-      },
-      {
-        "label": "Delete saved response",
-        "description": "Delete a saved general response",
-        "forUserType": "moderator",
-        "location": "subreddit",
-        "endpoint": "/internal/menu/delete-saved-response",
-        "postFilter": "none"
+        "endpoint": "/internal/menu/admin-open"
       }
     ]
   },
   "forms": {
+    "saved-response-manage":      "/internal/forms/saved-response/manage",
     "saved-response-select":      "/internal/forms/saved-response/step2",
     "saved-response-apply":       "/internal/forms/saved-response/apply",
     "saved-response-add":         "/internal/forms/saved-response/add",
@@ -107,6 +100,11 @@
         "label": "Chain Moderation — Depth cap notice",
         "helpText": "Message the bot posts when a comment hits the depth cap.",
         "defaultValue": "This comment has reached the maximum comment depth and locked. The comment was submitted for review and if found to be productive will be unlocked."
+      },
+      "appealBaseUrl": {
+        "type": "string",
+        "label": "Appeal — App base URL",
+        "helpText": "Public base URL of this app's web server (e.g. https://example.devvit.net). Required for one-click appeal links in modmail. Find it in your Devvit app settings."
       }
     }
   },

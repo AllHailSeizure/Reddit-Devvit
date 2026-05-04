@@ -1,6 +1,8 @@
 import type { Hono } from 'hono';
 import { redis, reddit } from '@devvit/web/server';
+import { readSetting } from '../app-settings';
 import type { MenuItemRequest, UiResponse } from '@devvit/web/shared';
+import { startAppeal } from './appeal';
 import { logger, logZSet } from '../logger';
 import type { CommentId, PostId } from '../types';
 
@@ -10,8 +12,9 @@ const LOG_KEY = 'bot:savedresponses:log';
 const LOG_MAX = 200;
 const SESSION_TTL = 300;
 
-type SavedResponse = { id: string; title: string; body: string };
-type ApplySession = { targetId: string };
+type ResponseLocation = 'post' | 'comment' | 'both';
+type SavedResponse = { id: string; title: string; body: string; location: ResponseLocation };
+type ApplySession = { targetId: string; targetType: 'post' | 'comment' };
 type EditSession = { responseId: string };
 
 type FlairLike = {
@@ -20,10 +23,11 @@ type FlairLike = {
 };
 
 type SelectFormValues = { responseId: string[] };
-type ApplyFormValues = { message: string; lock: boolean };
-type AddFormValues = { title: string; body: string };
+type LockMode = 'none' | 'lock' | 'lock_appeal';
+type ApplyFormValues = { message: string; lock: string[] };
+type AddFormValues = { title: string; body: string; location: string[] };
 type EditSelectFormValues = { responseId: string[] };
-type EditApplyFormValues = { title: string; body: string };
+type EditApplyFormValues = { title: string; body: string; location: string[] };
 type DeleteFormValues = { responseId: string[] };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -32,7 +36,10 @@ async function loadResponses(): Promise<SavedResponse[]> {
   const raw = await redis.get(REDIS_KEY);
   if (!raw) return [];
   try {
-    return JSON.parse(raw) as SavedResponse[];
+    return (JSON.parse(raw) as Omit<SavedResponse, 'location'>[]).map((r) => ({
+      ...r,
+      location: (r as SavedResponse).location ?? 'both',
+    }));
   } catch {
     return [];
   }
@@ -47,6 +54,22 @@ function sortedOptions(responses: SavedResponse[]): { label: string; value: stri
     .sort((a, b) => a.title.localeCompare(b.title, undefined, { numeric: true }))
     .map((r) => ({ label: r.title, value: r.id }));
 }
+
+function filteredSortedOptions(
+  responses: SavedResponse[],
+  targetType: 'post' | 'comment'
+): { label: string; value: string }[] {
+  return [...responses]
+    .filter((r) => r.location === 'both' || r.location === targetType)
+    .sort((a, b) => a.title.localeCompare(b.title, undefined, { numeric: true }))
+    .map((r) => ({ label: r.title, value: r.id }));
+}
+
+const LOCATION_OPTIONS = [
+  { label: 'Both posts and comments', value: 'both' },
+  { label: 'Posts only', value: 'post' },
+  { label: 'Comments only', value: 'comment' },
+];
 
 async function getApplySession(username: string): Promise<ApplySession | null> {
   const raw = await redis.get(`bot:savedresponses:apply:${username}`);
@@ -139,8 +162,16 @@ export function register(app: Hono): void {
       });
     }
 
+    const targetType = targetId.startsWith('t1_') ? 'comment' : 'post';
     const mod = (await reddit.getCurrentUsername()) ?? 'unknown';
-    await setApplySession(mod, { targetId });
+    await setApplySession(mod, { targetId, targetType });
+
+    const options = filteredSortedOptions(responses, targetType);
+    if (options.length === 0) {
+      return c.json<UiResponse>({
+        showToast: `No saved responses for ${targetType}s. Add some from the subreddit menu.`,
+      });
+    }
 
     return c.json<UiResponse>({
       showForm: {
@@ -154,7 +185,7 @@ export function register(app: Hono): void {
               type: 'select',
               name: 'responseId',
               label: 'Response',
-              options: sortedOptions(responses),
+              options,
               required: true,
             },
           ],
@@ -179,6 +210,14 @@ export function register(app: Hono): void {
       return c.json<UiResponse>({ showToast: 'Response not found.' });
     }
 
+    const lockOptions = [
+      { label: "Don't lock", value: 'none' },
+      { label: 'Lock', value: 'lock' },
+      ...(session.targetType === 'post'
+        ? [{ label: 'Lock and start appeal', value: 'lock_appeal' }]
+        : []),
+    ];
+
     return c.json<UiResponse>({
       showForm: {
         name: 'saved-response-apply',
@@ -194,10 +233,12 @@ export function register(app: Hono): void {
               required: true,
             },
             {
-              type: 'boolean',
+              type: 'select',
               name: 'lock',
-              label: 'Lock thread',
-              defaultValue: false,
+              label: 'Post action',
+              options: lockOptions,
+              defaultValue: ['none'],
+              required: true,
             },
           ],
         },
@@ -207,6 +248,7 @@ export function register(app: Hono): void {
 
   app.post('/internal/forms/saved-response/apply', async (c) => {
     const { message, lock } = await c.req.json<ApplyFormValues>();
+    const lockMode = (lock[0] ?? 'none') as LockMode;
     const mod = (await reddit.getCurrentUsername()) ?? 'unknown';
 
     const session = await getApplySession(mod);
@@ -217,6 +259,26 @@ export function register(app: Hono): void {
     const { targetId } = session;
     await redis.del(`bot:savedresponses:apply:${mod}`);
 
+    // ─── Lock and start appeal ─────────────────────────────────────────────────
+    if (lockMode === 'lock_appeal') {
+      if (!targetId.startsWith('t3_')) {
+        return c.json<UiResponse>({ showToast: 'Appeal can only be started on posts, not comments.' });
+      }
+      try {
+        const baseUrl = (await readSetting('appealBaseUrl', '')).trim();
+        if (!baseUrl) {
+          return c.json<UiResponse>({ showToast: 'Appeal base URL is not configured. Set it in subreddit settings.' });
+        }
+        await startAppeal(targetId, baseUrl);
+        await logZSet(LOG_KEY, { action: 'appeal', targetId, by: mod }, LOG_MAX);
+        return c.json<UiResponse>({ showToast: { text: 'Post locked. OP notified via modmail.', appearance: 'success' } });
+      } catch (err) {
+        log.error('Failed to start appeal', err);
+        return c.json<UiResponse>({ showToast: 'Failed to start appeal process.' });
+      }
+    }
+
+    // ─── Standard response + optional lock ────────────────────────────────────
     try {
       const expanded = await expandMacros(message, targetId);
 
@@ -230,7 +292,7 @@ export function register(app: Hono): void {
         log.warn('Could not distinguish comment', { id: reply.id });
       }
 
-      if (lock) {
+      if (lockMode === 'lock') {
         try {
           if (targetId.startsWith('t1_')) {
             const comment = await reddit.getCommentById(targetId as CommentId);
@@ -244,11 +306,11 @@ export function register(app: Hono): void {
         }
       }
 
-      await logZSet(LOG_KEY, { action: 'apply', targetId, lock, by: mod }, LOG_MAX);
+      await logZSet(LOG_KEY, { action: 'apply', targetId, lock: lockMode, by: mod }, LOG_MAX);
 
       return c.json<UiResponse>({
         showToast: {
-          text: lock ? 'Response posted and thread locked.' : 'Response posted.',
+          text: lockMode === 'lock' ? 'Response posted and thread locked.' : 'Response posted.',
           appearance: 'success',
         },
       });
@@ -258,49 +320,96 @@ export function register(app: Hono): void {
     }
   });
 
-  // ─── Add flow ─────────────────────────────────────────────────────────────
+  // ─── Manage menu ──────────────────────────────────────────────────────────
 
-  app.post('/internal/menu/add-saved-response', async (c) => {
+  app.post('/internal/menu/saved-responses', async (c) => {
     return c.json<UiResponse>({
       showForm: {
-        name: 'saved-response-add',
+        name: 'saved-response-manage',
         form: {
-          title: 'Add saved response',
-          acceptLabel: 'Save',
+          title: 'Saved responses',
+          acceptLabel: 'Next',
           fields: [
-            { type: 'string', name: 'title', label: 'Name', required: true },
-            { type: 'paragraph', name: 'body', label: 'Message', required: true },
+            {
+              type: 'select',
+              name: 'action',
+              label: 'What would you like to do?',
+              options: [
+                { label: 'New', value: 'new' },
+                { label: 'Edit', value: 'edit' },
+                { label: 'Delete', value: 'delete' },
+              ],
+              required: true,
+            },
           ],
         },
       },
     });
   });
 
-  app.post('/internal/forms/saved-response/add', async (c) => {
-    const { title, body } = await c.req.json<AddFormValues>();
+  app.post('/internal/forms/saved-response/manage', async (c) => {
+    const { action } = await c.req.json<{ action: string[] }>();
     const responses = await loadResponses();
-    responses.push({ id: makeId(), title: title.trim(), body: body.trim() });
-    await saveResponses(responses);
-    log.info('Saved response added', { title });
-    return c.json<UiResponse>({
-      showToast: { text: `Saved response "${title}" added.`, appearance: 'success' },
-    });
-  });
 
-  // ─── Edit flow ────────────────────────────────────────────────────────────
-
-  app.post('/internal/menu/edit-saved-response', async (c) => {
-    const responses = await loadResponses();
-    if (responses.length === 0) {
-      return c.json<UiResponse>({ showToast: 'No saved responses to edit.' });
+    if (action[0] === 'new') {
+      return c.json<UiResponse>({
+        showForm: {
+          name: 'saved-response-add',
+          form: {
+            title: 'New saved response',
+            acceptLabel: 'Save',
+            fields: [
+              { type: 'string', name: 'title', label: 'Name', required: true },
+              { type: 'paragraph', name: 'body', label: 'Message', required: true },
+              {
+                type: 'select',
+                name: 'location',
+                label: 'Available on',
+                helpText: 'Lock & Appeal requires "Posts only".',
+                options: LOCATION_OPTIONS,
+                defaultValue: ['both'],
+                required: true,
+              },
+            ],
+          },
+        },
+      });
     }
+
+    if (responses.length === 0) {
+      return c.json<UiResponse>({ showToast: 'No saved responses yet.' });
+    }
+
+    if (action[0] === 'edit') {
+      return c.json<UiResponse>({
+        showForm: {
+          name: 'saved-response-edit-select',
+          form: {
+            title: 'Edit saved response',
+            description: 'Select a response to edit.',
+            acceptLabel: 'Next',
+            fields: [
+              {
+                type: 'select',
+                name: 'responseId',
+                label: 'Response',
+                options: sortedOptions(responses),
+                required: true,
+              },
+            ],
+          },
+        },
+      });
+    }
+
+    // delete
     return c.json<UiResponse>({
       showForm: {
-        name: 'saved-response-edit-select',
+        name: 'saved-response-delete',
         form: {
-          title: 'Edit saved response',
-          description: 'Select a response to edit.',
-          acceptLabel: 'Next',
+          title: 'Delete saved response',
+          description: 'Select a response to permanently delete.',
+          acceptLabel: 'Delete',
           fields: [
             {
               type: 'select',
@@ -314,6 +423,26 @@ export function register(app: Hono): void {
       },
     });
   });
+
+  // ─── Add flow ─────────────────────────────────────────────────────────────
+
+  app.post('/internal/forms/saved-response/add', async (c) => {
+    const { title, body, location } = await c.req.json<AddFormValues>();
+    const responses = await loadResponses();
+    responses.push({
+      id: makeId(),
+      title: title.trim(),
+      body: body.trim(),
+      location: (location[0] ?? 'both') as ResponseLocation,
+    });
+    await saveResponses(responses);
+    log.info('Saved response added', { title });
+    return c.json<UiResponse>({
+      showToast: { text: `Saved response "${title}" added.`, appearance: 'success' },
+    });
+  });
+
+  // ─── Edit flow ────────────────────────────────────────────────────────────
 
   app.post('/internal/forms/saved-response/edit-select', async (c) => {
     const values = await c.req.json<EditSelectFormValues>();
@@ -349,6 +478,15 @@ export function register(app: Hono): void {
               defaultValue: response.body,
               required: true,
             },
+            {
+              type: 'select',
+              name: 'location',
+              label: 'Available on',
+              helpText: 'Lock & Appeal requires "Posts only".',
+              options: LOCATION_OPTIONS,
+              defaultValue: [response.location],
+              required: true,
+            },
           ],
         },
       },
@@ -356,7 +494,7 @@ export function register(app: Hono): void {
   });
 
   app.post('/internal/forms/saved-response/edit-apply', async (c) => {
-    const { title, body } = await c.req.json<EditApplyFormValues>();
+    const { title, body, location } = await c.req.json<EditApplyFormValues>();
     const mod = (await reddit.getCurrentUsername()) ?? 'unknown';
 
     const session = await getEditSession(mod);
@@ -370,7 +508,12 @@ export function register(app: Hono): void {
       return c.json<UiResponse>({ showToast: 'Response not found.' });
     }
 
-    responses[idx] = { id: session.responseId, title: title.trim(), body: body.trim() };
+    responses[idx] = {
+      id: session.responseId,
+      title: title.trim(),
+      body: body.trim(),
+      location: (location[0] ?? 'both') as ResponseLocation,
+    };
     await saveResponses(responses);
     await redis.del(`bot:savedresponses:edit:${mod}`);
 
@@ -381,32 +524,6 @@ export function register(app: Hono): void {
   });
 
   // ─── Delete flow ──────────────────────────────────────────────────────────
-
-  app.post('/internal/menu/delete-saved-response', async (c) => {
-    const responses = await loadResponses();
-    if (responses.length === 0) {
-      return c.json<UiResponse>({ showToast: 'No saved responses to delete.' });
-    }
-    return c.json<UiResponse>({
-      showForm: {
-        name: 'saved-response-delete',
-        form: {
-          title: 'Delete saved response',
-          description: 'Select a response to permanently delete.',
-          acceptLabel: 'Delete',
-          fields: [
-            {
-              type: 'select',
-              name: 'responseId',
-              label: 'Response',
-              options: sortedOptions(responses),
-              required: true,
-            },
-          ],
-        },
-      },
-    });
-  });
 
   app.post('/internal/forms/saved-response/delete', async (c) => {
     const values = await c.req.json<DeleteFormValues>();
