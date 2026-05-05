@@ -31,15 +31,5 @@ export async function run(event: OnCommentCreateRequest): Promise<void> {
     log.warn('lock failed', { error: (err as Error).message });
   }
 
-  try {
-    await reddit.addRemovalNote({
-      itemIds: [cv2.id as CommentId],
-      reasonId: 'other',
-      modNote: 'OP self-response auto-removed by llmphysics-bot',
-    });
-  } catch (err) {
-    log.warn('removal note failed', { error: (err as Error).message });
-  }
-
   await logZSet(SRM_LOG_KEY, { postId: post.id, commentId: cv2.id }, SRM_LOG_MAX);
 }

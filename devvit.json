@@ -29,18 +29,11 @@
   "menu": {
     "items": [
       {
-        "label": "Remove comment chain",
-        "description": "Remove this comment and all replies recursively",
+        "label": "Chain Mop",
+        "description": "Remove and/or lock this comment chain",
         "forUserType": "moderator",
         "location": "comment",
-        "endpoint": "/internal/menu/remove-comment-chain"
-      },
-      {
-        "label": "Lock comment chain",
-        "description": "Lock this comment and all replies recursively",
-        "forUserType": "moderator",
-        "location": "comment",
-        "endpoint": "/internal/menu/lock-comment-chain"
+        "endpoint": "/internal/menu/chain-mop"
       },
       {
         "label": "Apply saved response",
@@ -59,22 +52,24 @@
         "postFilter": "none"
       },
       {
-        "label": "Open Admin Panel",
-        "description": "Open the mod dashboard (settings, saved responses, appeals, logs)",
+        "label": "Bot Settings",
+        "description": "Edit bot settings (depth cap, signature, appeal URL, etc.)",
         "forUserType": "moderator",
         "location": "subreddit",
-        "endpoint": "/internal/menu/admin-open"
+        "endpoint": "/internal/menu/bot-settings"
       }
     ]
   },
   "forms": {
+    "chain-mop":                  "/internal/forms/chain-mop",
     "saved-response-manage":      "/internal/forms/saved-response/manage",
     "saved-response-select":      "/internal/forms/saved-response/step2",
     "saved-response-apply":       "/internal/forms/saved-response/apply",
     "saved-response-add":         "/internal/forms/saved-response/add",
     "saved-response-edit-select": "/internal/forms/saved-response/edit-select",
     "saved-response-edit-apply":  "/internal/forms/saved-response/edit-apply",
-    "saved-response-delete":      "/internal/forms/saved-response/delete"
+    "saved-response-delete":      "/internal/forms/saved-response/delete",
+    "bot-settings":               "/internal/forms/bot-settings"
   },
   "settings": {
     "global": {
@@ -103,11 +98,6 @@
         "label": "Chain Moderation — Depth cap notice",
         "helpText": "Message the bot posts when a comment hits the depth cap.",
         "defaultValue": "This comment has reached the maximum comment depth and locked. The comment was submitted for review and if found to be productive will be unlocked."
-      },
-      "appealBaseUrl": {
-        "type": "string",
-        "label": "Appeal — App base URL",
-        "helpText": "Public base URL of this app's web server (e.g. https://example.devvit.net). Required for one-click appeal links in modmail. Find it in your Devvit app settings."
       }
     }
   },

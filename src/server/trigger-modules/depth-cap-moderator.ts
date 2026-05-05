@@ -53,15 +53,5 @@ export async function run(event: OnCommentCreateRequest): Promise<void> {
 
   if (!deepest.locked) await deepest.lock();
 
-  // Walk up locking each ancestor while it has no other children (linear chain)
-  let childId: string = deepest.id;
-  for (let i = 1; i < ancestors.length; i++) {
-    const parent = ancestors[i];
-    const siblings = await parent.replies.all();
-    if (siblings.some(s => s.id !== childId)) break; // branch point — stop
-    if (!parent.locked) await parent.lock();
-    childId = parent.id;
-  }
-
   await logZSet(CAP_LOG_KEY, { commentId: cv2.id, cap }, CAP_LOG_MAX);
 }

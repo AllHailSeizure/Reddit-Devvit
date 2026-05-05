@@ -1,6 +1,5 @@
 import type { Hono } from 'hono';
 import { redis, reddit } from '@devvit/web/server';
-import { readSetting } from '../app-settings';
 import type { MenuItemRequest, UiResponse } from '@devvit/web/shared';
 import { startAppeal } from './appeal';
 import { logger, logZSet } from '../logger';
@@ -265,11 +264,7 @@ export function register(app: Hono): void {
         return c.json<UiResponse>({ showToast: 'Appeal can only be started on posts, not comments.' });
       }
       try {
-        const baseUrl = (await readSetting('appealBaseUrl', '')).trim();
-        if (!baseUrl) {
-          return c.json<UiResponse>({ showToast: 'Appeal base URL is not configured. Set it in subreddit settings.' });
-        }
-        await startAppeal(targetId, baseUrl);
+        await startAppeal(targetId);
         await logZSet(LOG_KEY, { action: 'appeal', targetId, by: mod }, LOG_MAX);
         return c.json<UiResponse>({ showToast: { text: 'Post locked. OP notified via modmail.', appearance: 'success' } });
       } catch (err) {
@@ -540,4 +535,48 @@ export function register(app: Hono): void {
       showToast: { text: `Response "${deleted.title}" deleted.`, appearance: 'success' },
     });
   });
+}
+
+// ─── Test helpers ─────────────────────────────────────────────────────────────
+//
+// testSavedResponseFlow(targetId) runs all four manage operations in sequence:
+//   add → apply → edit → delete
+// Each operation emits a log.info so the test runner can watch for all four.
+
+export async function testSavedResponseFlow(targetId: string): Promise<void> {
+  const id = '__test__';
+
+  // 1. Add
+  const responses = await loadResponses();
+  const filtered = responses.filter((r) => r.id !== id); // clean up any leftover
+  filtered.push({ id, title: 'Test SR Add', body: 'Test reply for {get_username}', location: 'both' });
+  await saveResponses(filtered);
+  log.info('Saved response added', { title: 'Test SR Add' });
+
+  try {
+    // 2. Apply
+    const expanded = await expandMacros('Test reply for {get_username}', targetId);
+    const reply = await reddit.submitComment({ id: targetId as CommentId | PostId, text: expanded });
+    try {
+      await reply.distinguish();
+    } catch {
+      log.warn('Could not distinguish test comment', { id: reply.id });
+    }
+    await logZSet(LOG_KEY, { action: 'test_apply', targetId }, LOG_MAX);
+    log.info('Test saved-response applied', { targetId });
+
+    // 3. Edit
+    const afterApply = await loadResponses();
+    const idx = afterApply.findIndex((r) => r.id === id);
+    if (idx !== -1) {
+      afterApply[idx] = { id, title: 'Test SR Edit', body: 'Edited body', location: 'both' };
+      await saveResponses(afterApply);
+      log.info('Saved response updated', { id, title: 'Test SR Edit' });
+    }
+  } finally {
+    // 4. Delete (always runs so Redis stays clean)
+    const final = await loadResponses();
+    await saveResponses(final.filter((r) => r.id !== id));
+    log.info('Saved response deleted', { id, title: 'Test SR Edit' });
+  }
 }

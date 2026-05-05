@@ -4,7 +4,6 @@ const DEFAULTS: Record<string, string | number | boolean> = {
   botSignature: '^I ^am ^a ^bot. ^This ^action ^was ^performed ^automatically. ^Contact ^the ^moderators ^if ^you ^have ^questions.',
   depthCap: 10,
   depthCapNotice: 'This comment has reached the maximum comment depth and locked. The comment was submitted for review and if found to be productive will be unlocked.',
-  appealBaseUrl: '',
 };
 
 export async function readSetting<T extends string | number | boolean>(
@@ -12,7 +11,7 @@ export async function readSetting<T extends string | number | boolean>(
   defaultValue: T,
 ): Promise<T> {
   const raw = await redis.get(`settings:${key}`);
-  if (raw === null) return defaultValue;
+  if (raw == null) return defaultValue;
   if (typeof defaultValue === 'number') return Number(raw) as T;
   if (typeof defaultValue === 'boolean') return (raw === 'true') as T;
   return raw as T;

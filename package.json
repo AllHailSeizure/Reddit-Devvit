@@ -1,32 +1,24 @@
 {
   "name": "llmphysics-bot",
-  "version": "2.0.2.5",
+  "version": "2.5.1.4",
   "private": true,
   "scripts": {
-    "build:client": "esbuild src/client/index.tsx --bundle --platform=browser --format=iife --target=es2020 --jsx=automatic --outfile=webroot/bundle.js",
-    "build:embed": "node scripts/embed-client.mjs",
-    "build:server": "esbuild src/server/index.ts --bundle --platform=node --format=cjs --outfile=dist/server/index.js",
-    "build": "npm run build:client && npm run build:embed && npm run build:server",
+    "build": "esbuild src/server/index.ts --bundle --platform=node --format=cjs --outfile=dist/server/index.js",
     "build:categories": "node scripts/build-category-db.mjs",
     "dev": "devvit playtest r/llmphysics_dev"
   },
   "dependencies": {
     "@devvit/web": "^0.12.0",
     "@hono/node-server": "^2.0.0",
-    "hono": "^4.0.0",
-    "react": "^19.2.5",
-    "react-dom": "^19.2.5"
+    "hono": "^4.0.0"
   },
   "devDependencies": {
     "@devvit/shared-types": "^0.12.20",
     "@types/node": "^20.0.0",
-    "@types/react": "^19.2.14",
-    "@types/react-dom": "^19.2.3",
     "esbuild": "^0.28.0",
     "typescript": "^5.0.0"
   }
 }
-
 
 
 

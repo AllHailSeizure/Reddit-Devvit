@@ -16,19 +16,26 @@ export async function run(event: OnModMailRequest): Promise<void> {
   const senderName = event.messageAuthor?.name ?? '';
   if (!senderName) return;
 
-  let subject: string;
+  let firstBody: string;
+  let latestBody: string;
   try {
     const { conversation } = await reddit.modMail.getConversation({ conversationId });
-    subject = conversation?.subject ?? '';
+    if (conversation?.subject !== 'Your post has been locked') return;
+    const sorted = Object.values(conversation?.messages ?? {})
+      .sort((a, b) => new Date(a.date ?? 0).getTime() - new Date(b.date ?? 0).getTime());
+    firstBody  = sorted[0]?.body ?? '';
+    latestBody = sorted[sorted.length - 1]?.body?.trim() ?? '';
   } catch (err) {
     log.warn('Could not fetch modmail conversation', { conversationId, error: (err as Error).message });
     return;
   }
 
-  const match = subject.match(/^APPEAL:\s+(DELETE|REVIEW)\s+(t3_\w+)$/i);
-  if (!match) return;
+  if (latestBody !== '!remove') return;
 
-  const [, action, postId] = match;
+  // Post URL is always in the first message as [post](<url>); extract the id36 from the path
+  const urlMatch = firstBody.match(/\[post\]\(https?:\/\/[^)]*\/comments\/([a-z0-9]+)\//i);
+  if (!urlMatch) return;
+  const postId = `t3_${urlMatch[1]}`;
   const key = appealKey(postId);
 
   const raw = await redis.get(key);
@@ -49,37 +56,23 @@ export async function run(event: OnModMailRequest): Promise<void> {
     return;
   }
 
-  if (action.toUpperCase() === 'DELETE') {
-    try {
-      await reddit.remove(postId as PostId, false);
-    } catch (err) {
-      log.warn('Could not remove post', { postId, error: (err as Error).message });
-      await reply(conversationId, 'Failed to remove the post. Please contact the mods directly.');
-      return;
-    }
-    record.state = 'removed';
-    await redis.set(key, JSON.stringify(record));
-    await reply(conversationId, 'Your post has been removed.');
-    await logZSet(APPEAL_LOG_KEY, { action: 'appeal_delete', postId, by: senderName }, APPEAL_LOG_MAX);
-    log.info('Appeal: post removed', { postId, by: senderName });
-  } else {
-    try {
-      await reddit.modMail.createModDiscussionConversation({
-        subredditId: record.subredditId as `t5_${string}`,
-        subject: `Fix review requested: "${record.postTitle}"`,
-        bodyMarkdown: `u/${senderName} has fixed their post and requests a review.\n\n[View post](${record.postUrl})`,
-      });
-    } catch (err) {
-      log.warn('Could not create mod discussion', { postId, error: (err as Error).message });
-      await reply(conversationId, 'Failed to notify mods. Please contact them directly.');
-      return;
-    }
-    record.state = 'review_requested';
-    await redis.set(key, JSON.stringify(record));
-    await reply(conversationId, 'Mods have been notified to review your changes. Thank you for following up!');
-    await logZSet(APPEAL_LOG_KEY, { action: 'appeal_review', postId, by: senderName }, APPEAL_LOG_MAX);
-    log.info('Appeal: review requested', { postId, by: senderName });
+  try {
+    await reddit.remove(postId as PostId, false);
+  } catch (err) {
+    log.warn('Could not remove post', { postId, error: (err as Error).message });
+    await reply(conversationId, 'Failed to remove the post. Please contact the mods directly.');
+    return;
   }
+  record.state = 'removed';
+  await redis.set(key, JSON.stringify(record));
+  await reply(conversationId, 'Thanks!');
+  try {
+    await reddit.modMail.archiveConversation(conversationId);
+  } catch (err) {
+    log.warn('Could not archive conversation', { conversationId, error: (err as Error).message });
+  }
+  await logZSet(APPEAL_LOG_KEY, { action: 'appeal_delete', postId, by: senderName }, APPEAL_LOG_MAX);
+  log.info('Appeal: post removed', { postId, by: senderName });
 }
 
 async function reply(conversationId: string, body: string): Promise<void> {
