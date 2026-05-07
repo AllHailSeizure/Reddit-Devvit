@@ -29,6 +29,13 @@
   "menu": {
     "items": [
       {
+        "label": "Start Bingo Game",
+        "description": "Spin up a bingo game for this post using LLM clichés",
+        "forUserType": "user",
+        "location": "post",
+        "endpoint": "/internal/menu/bingo-start"
+      },
+      {
         "label": "Chain Mop",
         "description": "Remove and/or lock this comment chain",
         "forUserType": "moderator",
