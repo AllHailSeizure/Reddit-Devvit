@@ -23,10 +23,12 @@ import { runOnCommentReport, runOnPostReport } from './trigger-modules/report-fi
 // Add one import line per new command module (side-effect: registers the command), e.g.:
 // import './command-modules/score-command';
 import './command-modules/define';
+import './command-modules/bingo-card';
 
 // ─── Menu module imports ───────────────────────────────────────────────────────
 // Add one import line per new menu module, e.g.:
 // import { register as registerMyModule } from './action-modules/my-module';
+import { register as registerBingoGame } from './action-modules/bingo-game';
 import { register as registerChainModerator } from './action-modules/chain-moderator';
 import { register as registerSavedResponses } from './action-modules/saved-responses';
 import { register as registerAdmin } from './admin';
@@ -86,6 +88,7 @@ export function registerAll(app: Hono): void {
   }
 
   // Menu modules — add one line per new menu module
+  registerBingoGame(app);
   registerChainModerator(app);
   registerSavedResponses(app);
   registerAdmin(app);
