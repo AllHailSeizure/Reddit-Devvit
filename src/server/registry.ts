@@ -1,6 +1,6 @@
 import type { Hono } from 'hono';
 import type { TriggerResponse } from '@devvit/web/shared';
-import { logger } from './logger';
+import { logger } from './helpers/log-helper';
 import type {
   AppInstallHandler,
   AppUpgradeHandler,
@@ -9,6 +9,7 @@ import type {
   PostReportHandler,
   CommentReportHandler,
   ModActionsHandler,
+  PostDeleteHandler,
   ModMailHandler,
   ModuleHandler,
 } from './types';
@@ -16,36 +17,39 @@ import type {
 // ─── Trigger module imports ────────────────────────────────────────────────────
 // Add one import line per new trigger module, e.g.:
 // import { run as spamFilter } from './action-modules/spam-filter';
-import { runOnComment, runOnPost } from './command';
-import { runOnCommentReport, runOnPostReport } from './trigger-modules/report-filter';
+import { runOnComment, runOnPost } from './helpers/command-helper';
+import { runOnCommentReport, runOnPostReport } from './trigger-modules/report-moderator';
+import { run as runLengthModerator } from './trigger-modules/length-moderator';
 
 // ─── Command module imports ────────────────────────────────────────────────────
 // Add one import line per new command module (side-effect: registers the command), e.g.:
 // import './command-modules/score-command';
-import './command-modules/define';
-import './command-modules/bingo-card';
+import './command-modules/define-command';
+// import './command-modules/bingo-card-command'; // TODO: enable when bingo module is ready
 
 // ─── Menu module imports ───────────────────────────────────────────────────────
 // Add one import line per new menu module, e.g.:
 // import { register as registerMyModule } from './action-modules/my-module';
 import { register as registerBingoGame } from './action-modules/bingo-game';
-import { register as registerChainModerator } from './action-modules/chain-moderator';
-import { register as registerSavedResponses } from './action-modules/saved-responses';
+import { register as registerMopTool } from './action-modules/mop-tool';
+import { register as registerResponseTool } from './action-modules/response-tool';
+import { register as registerQuotaViewer } from './action-modules/quota-viewer';
 import { register as registerAdmin } from './admin';
 import { run as runDepthCapModerator } from './trigger-modules/depth-cap-moderator';
 import { run as runSelfResponseModerator } from './trigger-modules/self-response-moderator';
-import { run as runFloodAssistant } from './trigger-modules/flood-assistant';
+import { runQuotaCheck, runOnModAction as runFloodOnModAction, runOnPostDelete as runFloodOnPostDelete } from './trigger-modules/flood-moderator';
 
 // ─── Trigger arrays ────────────────────────────────────────────────────────────
 // Add the imported run() to the appropriate array (one line per module).
 
 const APP_INSTALL:    AppInstallHandler[]    = [];
 const APP_UPGRADE:    AppUpgradeHandler[]    = [];
-const POST_SUBMIT:    PostSubmitHandler[]    = [runOnPost, runFloodAssistant];
+const POST_SUBMIT:    PostSubmitHandler[]    = [runOnPost]; // runQuotaCheck, runLengthModerator disabled
 const COMMENT_CREATE: CommentCreateHandler[] = [runOnComment, runDepthCapModerator, runSelfResponseModerator];
 const POST_REPORT:    PostReportHandler[]    = [runOnPostReport];
 const COMMENT_REPORT: CommentReportHandler[] = [runOnCommentReport];
-const MOD_ACTIONS:    ModActionsHandler[]    = [];
+const MOD_ACTIONS:    ModActionsHandler[]    = [runFloodOnModAction];
+const POST_DELETE:    PostDeleteHandler[]    = [runFloodOnPostDelete];
 const MOD_MAIL:       ModMailHandler[]       = [];
 
 // ─── Dispatch ──────────────────────────────────────────────────────────────────
@@ -75,6 +79,7 @@ const TRIGGER_ROUTES: Array<[string, AnyHandler[]]> = [
   ['post-report',    POST_REPORT],
   ['comment-report', COMMENT_REPORT],
   ['mod-action',     MOD_ACTIONS],
+  ['post-delete',    POST_DELETE],
   ['mod-mail',       MOD_MAIL],
 ];
 
@@ -87,8 +92,9 @@ export function registerAll(app: Hono): void {
   }
 
   // Menu modules — add one line per new menu module
-  registerBingoGame(app);
-  registerChainModerator(app);
-  registerSavedResponses(app);
+  // registerBingoGame(app); // disabled
+  registerMopTool(app);
+  registerResponseTool(app);
+  registerQuotaViewer(app);
   registerAdmin(app);
 }

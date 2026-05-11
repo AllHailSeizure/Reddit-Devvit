@@ -1,10 +1,10 @@
 import type { Hono } from 'hono';
 import { redis, reddit } from '@devvit/web/server';
 import type { MenuItemRequest, UiResponse } from '@devvit/web/shared';
-import { logger, logZSet } from '../logger';
+import { logger, logZSet } from '../helpers/log-helper';
 import type { CommentId } from '../types';
 
-const log = logger('chain-moderator');
+const log = logger('mop-tool');
 const CHAIN_LOG_KEY = 'bot:chainmod:log';
 const CHAIN_LOG_MAX = 200;
 const SESSION_TTL = 300;

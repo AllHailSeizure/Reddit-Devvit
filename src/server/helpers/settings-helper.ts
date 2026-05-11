@@ -5,7 +5,21 @@ const DEFAULTS: Record<string, string | number | boolean> = {
   depthCap: 10,
   depthCapResponse: '',
   floodAssistantResponse: '',
+  floodAssistantMaxPosts: 1,
+  floodAssistantWindowHours: 24,
+  floodAssistantIgnoreModerators: true,
+  floodAssistantIgnoreContributors: true,
+  floodAssistantIgnoreAutoRemoved: true,
+  floodAssistantIgnoreRemoved: true,
+  floodAssistantIgnoreDeleted: true,
   selfResponseResponse: '',
+  selfResponseIgnoreModerators: true,
+  selfResponseIgnoreContributors: true,
+  lengthModFlairId: '',
+  lengthModMaxUnhostedLength: 0,
+  lengthModMinHostedLength: 0,
+  lengthModMaxUnhostedComment: '',
+  lengthModMinHostedComment: '',
 };
 
 export async function readSetting<T extends string | number | boolean>(

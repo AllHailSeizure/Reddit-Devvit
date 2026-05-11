@@ -1,9 +1,9 @@
 import { reddit, redis } from '@devvit/web/server';
 import type { OnCommentReportRequest, OnPostReportRequest } from '@devvit/web/shared';
-import { logger } from '../logger';
+import { logger } from '../helpers/log-helper';
 import type { CommentId, PostId } from '../types';
 
-const log = logger('report-filter');
+const log = logger('report-moderator');
 
 const BOT_AUTHORS = new Set(['AutoModerator', 'FloodAssistant', 'LLMPhysics-ModTeam', 'llmphysics-bot']);
 

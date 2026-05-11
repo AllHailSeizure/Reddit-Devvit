@@ -1,7 +1,7 @@
 import type { Hono } from 'hono';
 import { redis, reddit } from '@devvit/web/server';
 import type { MenuItemRequest, UiResponse } from '@devvit/web/shared';
-import { logger } from '../logger';
+import { logger } from '../helpers/log-helper';
 import type { PostId } from '../types';
 
 const log = logger('bingo-game');

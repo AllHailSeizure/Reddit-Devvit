@@ -1,7 +1,7 @@
 import { reddit, settings } from '@devvit/web/server';
-import { logger } from '../logger';
-import { registerCommand } from '../command';
-import { readSetting, formatSignature } from '../app-settings';
+import { logger } from '../helpers/log-helper';
+import { registerCommand } from '../helpers/command-helper';
+import { readSetting, formatSignature } from '../helpers/settings-helper';
 import type { CommandEvent } from '../types';
 
 const log = logger('define');
@@ -54,9 +54,9 @@ async function geminiResolve(term: string, apiKey: string): Promise<string | nul
   }
 
   if (!res.ok) throw new Error(`Gemini API ${res.status}`);
-  
+
   const data = await res.json() as any;
-  
+
   // Check if grounding was actually used for debugging/testing
   if (data.candidates?.[0]?.groundingMetadata) {
     log.info('Search grounding used for resolution', { term });

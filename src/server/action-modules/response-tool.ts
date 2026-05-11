@@ -1,10 +1,10 @@
 import type { Hono } from 'hono';
 import { redis, reddit } from '@devvit/web/server';
 import type { MenuItemRequest, UiResponse } from '@devvit/web/shared';
-import { logger, logZSet } from '../logger';
+import { logger, logZSet } from '../helpers/log-helper';
 import type { CommentId, PostId } from '../types';
 
-const log = logger('saved-responses');
+const log = logger('response-tool');
 const REDIS_KEY = 'bot:savedresponses';
 const LOG_KEY = 'bot:savedresponses:log';
 const LOG_MAX = 200;

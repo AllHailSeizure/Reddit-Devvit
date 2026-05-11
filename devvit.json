@@ -28,17 +28,11 @@
     "onPostReport": "/internal/triggers/post-report",
     "onCommentReport": "/internal/triggers/comment-report",
     "onModAction": "/internal/triggers/mod-action",
+    "onPostDelete": "/internal/triggers/post-delete",
     "onModMail": "/internal/triggers/mod-mail"
   },
   "menu": {
     "items": [
-      {
-        "label": "Start Bingo Game",
-        "description": "Spin up a bingo game for this post using LLM clichés",
-        "forUserType": "user",
-        "location": "post",
-        "endpoint": "/internal/menu/bingo-start"
-      },
       {
         "label": "Chain Mop",
         "description": "Remove and/or lock this comment chain",
@@ -68,6 +62,13 @@
         "forUserType": "moderator",
         "location": "subreddit",
         "endpoint": "/internal/menu/bot-settings"
+      },
+      {
+        "label": "Flood Quota Checker",
+        "description": "Check a user's flood quota status.",
+        "forUserType": "moderator",
+        "location": "subreddit",
+        "endpoint": "/internal/menu/quota-viewer"
       }
     ]
   },
@@ -80,7 +81,9 @@
     "saved-response-edit-select": "/internal/forms/saved-response/edit-select",
     "saved-response-edit-apply":  "/internal/forms/saved-response/edit-apply",
     "saved-response-delete":      "/internal/forms/saved-response/delete",
-    "bot-settings":               "/internal/forms/bot-settings"
+    "bot-settings":               "/internal/forms/bot-settings",
+    "quota-viewer-search":        "/internal/forms/quota-viewer-search",
+    "quota-viewer-result":        "/internal/forms/quota-viewer-result"
   },
   "settings": {
     "global": {
@@ -126,10 +129,52 @@
         "helpText": "Time window in hours. Default: 24.",
         "defaultValue": 24
       },
+      "floodAssistantIgnoreModerators": {
+        "type": "boolean",
+        "label": "Flood Assistant — Ignore moderators",
+        "helpText": "If enabled, posts by moderators will not be removed.",
+        "defaultValue": true
+      },
+      "floodAssistantIgnoreContributors": {
+        "type": "boolean",
+        "label": "Flood Assistant — Ignore contributors",
+        "helpText": "If enabled, posts by approved submitters will not be removed.",
+        "defaultValue": true
+      },
+      "floodAssistantIgnoreAutoRemoved": {
+        "type": "boolean",
+        "label": "Flood Assistant — Ignore auto-removed posts",
+        "helpText": "If enabled, posts that are immediately removed will not count towards the quota.",
+        "defaultValue": true
+      },
+      "floodAssistantIgnoreRemoved": {
+        "type": "boolean",
+        "label": "Flood Assistant — Ignore moderator-removed posts",
+        "helpText": "If enabled, posts removed by moderators will not count towards the quota.",
+        "defaultValue": true
+      },
+      "floodAssistantIgnoreDeleted": {
+        "type": "boolean",
+        "label": "Flood Assistant — Ignore deleted posts",
+        "helpText": "If enabled, posts deleted by the author will not count towards the quota.",
+        "defaultValue": true
+      },
       "selfResponseResponse": {
         "type": "paragraph",
         "label": "Self-Response Moderator — Self-response triggered comment",
         "helpText": "Commented when a user responds to their own post."
+      },
+      "selfResponseIgnoreModerators": {
+        "type": "boolean",
+        "label": "Self-Response Moderator — Ignore moderators",
+        "helpText": "If enabled, the self-response rule will not apply to moderators.",
+        "defaultValue": true
+      },
+      "selfResponseIgnoreContributors": {
+        "type": "boolean",
+        "label": "Self-Response Moderator — Ignore approved submitters",
+        "helpText": "If enabled, the self-response rule will not apply to approved submitters.",
+        "defaultValue": true
       }
     }
   },

@@ -1,7 +1,7 @@
 import { reddit, redis } from '@devvit/web/server';
 import type { OnCommentCreateRequest } from '@devvit/web/shared';
-import { logger, logZSet } from '../logger';
-import { readSetting, formatSignature } from '../app-settings';
+import { logger, logZSet } from '../helpers/log-helper';
+import { readSetting, formatSignature } from '../helpers/settings-helper';
 import type { CommentId } from '../types';
 
 const log = logger('self-response-moderator');
@@ -28,6 +28,35 @@ export async function run(event: OnCommentCreateRequest): Promise<void> {
     log.warn('Failed to set expiration on dedup key', { dedupeKey, expireSeconds: 3600, error: (err as Error).message });
   }
 
+  const ignoreModerators = await readSetting('selfResponseIgnoreModerators', true);
+  const ignoreContributors = await readSetting('selfResponseIgnoreContributors', true);
+
+  if ((ignoreModerators || ignoreContributors) && event.author?.name && event.subreddit?.name) {
+    const subredditName = event.subreddit.name;
+    const authorName = event.author.name;
+    try {
+      if (ignoreModerators) {
+        const user = await reddit.getUserByUsername(authorName);
+        if (user) {
+          const modPerms = await user.getModPermissionsForSubreddit(subredditName);
+          if (modPerms.length > 0) {
+            log.info('Comment ignored (moderator)', { commentId: cv2.id, username: authorName });
+            return;
+          }
+        }
+      }
+      if (ignoreContributors) {
+        const approved = await reddit.getApprovedUsers({ subredditName, username: authorName }).all();
+        if (approved.length > 0) {
+          log.info('Comment ignored (approved submitter)', { commentId: cv2.id, username: authorName });
+          return;
+        }
+      }
+    } catch (err) {
+      log.warn('Could not check author permissions', { error: (err as Error).message, commentId: cv2.id });
+    }
+  }
+
   log.info('OP top-level comment — removing and locking', { commentId: cv2.id, postId: post.id });
 
   const comment = await reddit.getCommentById(cv2.id as CommentId);
@@ -37,7 +66,9 @@ export async function run(event: OnCommentCreateRequest): Promise<void> {
     const rawSignature = await readSetting('botSignature', '');
     const notice = selfResponseResponse + formatSignature(rawSignature);
     try {
-      await comment.reply({ text: notice });
+      const reply = await comment.reply({ text: notice });
+      try { await reply.distinguish(); } catch (err) { log.warn('Could not distinguish self-response notice', { error: (err as Error).message }); }
+      try { await reply.lock(); } catch (err) { log.warn('Could not lock self-response notice', { error: (err as Error).message }); }
     } catch (err) {
       log.warn('Could not leave self-response notice', { error: (err as Error).message });
     }

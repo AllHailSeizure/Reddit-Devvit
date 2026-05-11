@@ -1,7 +1,7 @@
 import { reddit, redis } from '@devvit/web/server';
 import type { OnCommentCreateRequest } from '@devvit/web/shared';
-import { logger, logZSet } from '../logger';
-import { readSetting, formatSignature } from '../app-settings';
+import { logger, logZSet } from '../helpers/log-helper';
+import { readSetting, formatSignature } from '../helpers/settings-helper';
 import type { CommentId } from '../types';
 
 const log = logger('depth-cap-moderator');
@@ -55,14 +55,20 @@ export async function run(event: OnCommentCreateRequest): Promise<void> {
 
   // Reply before locking so the bot can post to an unlocked comment
   try {
-    await deepest.reply({
-      text: notice,
-    });
+    const reply = await deepest.reply({ text: notice });
+    try { await reply.distinguish(); } catch (err) { log.warn('Could not distinguish depth cap notice', { error: (err as Error).message }); }
+    try { await reply.lock(); } catch (err) { log.warn('Could not lock depth cap notice', { error: (err as Error).message }); }
   } catch (err) {
     log.warn('Could not leave depth cap notice', { error: (err as Error).message });
   }
 
   if (!deepest.locked) await deepest.lock();
 
-  await logZSet(CAP_LOG_KEY, { commentId: cv2.id, cap }, CAP_LOG_MAX);
+  try {
+    await deepest.report({ reason: 'Depth cap trigger' });
+  } catch (err) {
+    log.warn('Could not report depth cap trigger comment', { error: (err as Error).message });
+  }
+
+  await logZSet(CAP_LOG_KEY, { action: 'Depth cap trigger', commentId: cv2.id, cap }, CAP_LOG_MAX);
 }

@@ -5,8 +5,8 @@ import type {
   CommandHandler,
   CommandEvent,
   RegisteredCommand,
-} from './types';
-import { logger } from './logger';
+} from '../types';
+import { logger } from './log-helper';
 import { redis } from '@devvit/web/server';
 
 const log = logger('command');

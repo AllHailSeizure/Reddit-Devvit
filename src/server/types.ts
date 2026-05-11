@@ -6,6 +6,7 @@ import type {
   OnPostReportRequest,
   OnCommentReportRequest,
   OnModActionRequest,
+  OnPostDeleteRequest,
   OnModMailRequest,
 } from '@devvit/web/shared';
 
@@ -18,6 +19,7 @@ export type CommentCreateHandler = ModuleHandler<OnCommentCreateRequest>;
 export type PostReportHandler    = ModuleHandler<OnPostReportRequest>;
 export type CommentReportHandler = ModuleHandler<OnCommentReportRequest>;
 export type ModActionsHandler    = ModuleHandler<OnModActionRequest>;
+export type PostDeleteHandler    = ModuleHandler<OnPostDeleteRequest>;
 export type ModMailHandler       = ModuleHandler<OnModMailRequest>;
 
 // ─── Command types ─────────────────────────────────────────────────────────────

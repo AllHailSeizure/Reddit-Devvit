@@ -1,8 +1,8 @@
 import { redis, reddit } from '@devvit/web/server';
-import { logger } from '../logger';
-import { registerCommand } from '../command';
+import { logger } from '../helpers/log-helper';
+import { registerCommand } from '../helpers/command-helper';
 import type { CommandEvent, CommentId } from '../types';
-import { BINGO_WORDS } from '../bingo-words';
+import { BINGO_WORDS } from '../bingo-words-list';
 import { sourceKey } from '../action-modules/bingo-game';
 
 const log = logger('bingo-card');
