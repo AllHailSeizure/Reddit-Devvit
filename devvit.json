@@ -41,7 +41,7 @@
         "endpoint": "/internal/menu/chain-mop"
       },
       {
-        "label": "Saved responses",
+        "label": "Saved Responses",
         "description": "Comment with with a canned response.",
         "forUserType": "moderator",
         "location": ["comment", "post"],
@@ -49,7 +49,7 @@
         "postFilter": "none"
       },
       {
-        "label": "Saved responses",
+        "label": "Saved Responses",
         "description": "Add, edit, or delete saved general responses",
         "forUserType": "moderator",
         "location": "subreddit",
@@ -57,46 +57,46 @@
         "postFilter": "none"
       },
       {
-        "label": "Settings — Modules",
+        "label": "Flood Quota",
+        "description": "Check a user's flood quota status.",
+        "forUserType": "moderator",
+        "location": "subreddit",
+        "endpoint": "/internal/menu/quota-viewer"
+      },
+      {
+        "label": "Module Toggles",
         "description": "Enable or disable modules.",
         "forUserType": "moderator",
         "location": "subreddit",
         "endpoint": "/internal/menu/bot-settings-modules"
       },
       {
-        "label": "Settings — Flood Moderator",
+        "label": "Flood Settings",
         "description": "Configure flood moderator limits and filters.",
         "forUserType": "moderator",
         "location": "subreddit",
         "endpoint": "/internal/menu/bot-settings-flood"
       },
       {
-        "label": "Settings — Commenting",
+        "label": "Comment Settings",
         "description": "Configure depth cap and self-response rules.",
         "forUserType": "moderator",
         "location": "subreddit",
         "endpoint": "/internal/menu/bot-settings-commenting"
       },
       {
-        "label": "Settings — Posting",
+        "label": "Post Settings",
         "description": "Configure post length limits.",
         "forUserType": "moderator",
         "location": "subreddit",
         "endpoint": "/internal/menu/bot-settings-posting"
       },
       {
-        "label": "Settings — Removal Messages",
+        "label": "Bot Messages",
         "description": "Configure bot signature and removal messages.",
         "forUserType": "moderator",
         "location": "subreddit",
         "endpoint": "/internal/menu/bot-settings-removal-messages"
-      },
-      {
-        "label": "Flood Quota Checker",
-        "description": "Check a user's flood quota status.",
-        "forUserType": "moderator",
-        "location": "subreddit",
-        "endpoint": "/internal/menu/quota-viewer"
       }
     ]
   },

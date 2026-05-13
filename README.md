@@ -1,4 +1,4 @@
-# llmphysics-bot  2.7.0 — Moderator Guide
+# llmphysics-bot  2.8.1 — Moderator Guide
 
 A modular moderation-assistance bot for [r/LLMPhysics](https://reddit.com/r/LLMPhysics), built on the [Devvit](https://developers.reddit.com/docs) platform.
 
@@ -13,7 +13,8 @@ You don't need to lift a finger for these. The bot performs the following tasks 
 *   **Self-Response Moderator:** Prevents the original poster from cluttering the top-level comment section by locking and removing their own follow-up comments.
 *   **Depth Cap:** Keeps conversations readable. Once a thread exceeds the configured depth limit, the bot automatically locks the deepest branch.
 *   **Flood Assistant:** Protects the sub from spam by limiting the number of posts a user can submit within a 24-hour window.
-*   **Report Filter:** Keeps your mod queue clean by automatically ignoring reports on the bot's own activity (in active testing, may not be 100% reliable).
+*   **Length Moderator:** Ensures post quality by enforcing character limits based on post flair or content type.
+*   **Report Filter:** Keeps your mod queue clean by automatically ignoring reports on the bot's own activity.
 
 ### Manual Moderation Tools
 Available via the **Mod Shield** icon on posts and comments:
@@ -30,48 +31,44 @@ Available via the **Mod Shield** icon on posts and comments:
 
 ---
 
-## 2. Bot Settings Reference
+## 2. Settings Guide (v2.8.1)
+Moderators can manage all bot behaviors in the **Bot Settings** menu (found under the Subreddit header overflow menu). Settings are organized into five main categories:
 
-Moderators can manage bot behavior in the **Bot Settings** menu (found under the Subreddit header overflow menu).
+### Modules
+Enable or disable specific features:
+*   **Depth Cap Moderator**
+*   **Flood Moderator**
+*   **Self-Response Moderator**
+*   **Length Moderator**
+*   **Chain Mop**
+*   **Saved Responses**
+*   **Define Command**
 
-### Global Settings
-*   **Bot Signature:** Appended to all bot comments in superscript with a horizontal rule for professional identification. Leave blank to disable.
+### 
 
-### Chain Moderation
-*   **Maximum Comment Chain Depth:** Limits how deep a conversation can go. (Default: 10; 0 to disable).
-*   **Depth Cap Notice:** The custom message the bot posts when it locks a chain at the depth limit.
+### Flood Moderator
+Manage spam controls:
+*   **Max posts per window:** The limit of submissions allowed for a single user within the defined timeframe.
+*   **Time window (hours):** The rolling duration (in hours) to enforce the post limit.
+*   **Ignore flags:** Toggle automatic exemptions for Moderators, Approved Submitters, and various types of removed/deleted posts to prevent over-moderation of legitimate activity.
 
-### Flood Assistant
-*   **Flood Assistant Triggered Comment:** The message the bot posts when it removes a submission due to flood limits.
+### Commenting
+Configure settings for comment interactions:
+*   **Depth cap:** Maximum allowed depth for conversation branches before they are automatically locked.
+*   **Ignore flags:** Toggle exemptions (Moderators/Approved Submitters) for both the **Depth Cap** and **Self-Response** modules.
 
-### Self-Response Moderator
-*   **Self-Response Triggered Comment:** The message the bot posts when it locks and removes an OP's top-level self-reply.
+### Posting
+Configure settings for post requirements:
+*   **Flair template ID for max length posts:** Specify the Reddit flair template ID that triggers these character limits.
+*   **Max unhosted length:** The maximum allowed character count for posts bearing the specified flair.
+*   **Min hosted length:** The minimum allowed character count required for link (hosted) posts to ensure quality discussions.
 
----
-
+### Removal Messages
+Customize the text users receive when content is removed or restricted:
+*   **Bot signature:** The identifier appended to all bot comments (automatically formatted as superscript). Leave blank to disable.
+*   **Custom responses:** Tailored messages for Flood, Depth Cap, Self-Response, and Length-based removals.
 ## 3. Interaction Commands
 
 Any user can trigger a definition by mentioning the bot in a comment:
-
-```
-u/LLMPhysics-bot !define [term]
-```
-
-The bot replies with a definition - it uses Gemini search grounding to find the most relevant Wikipedia article, and quotes directly from the page.
-
-##4. Future Features
-
-LLMPhysics-bot is in active development by u/AllHailSeizure. Any feedback is welcome. Current features being worked on include:
-    -Active/Reactive appeal
-    -LLMPhysics Bingo game
-    -LLM response detection
-
-
-
-
-
-
-
-
 
 

@@ -47,7 +47,64 @@ async function enforce(
 }
 
 export async function run(event: OnPostSubmitRequest): Promise<void> {
-  log.info('Length moderator called');
+  const post = event.post;
+  if (!post?.id) {
+    log.warn('No post ID');
+    return;
+  }
+
+  const postId = post.id as PostId;
+
+  const dedupeKey = `bot:lenmod:handled:${postId}`;
+  const claimed = await redis.set(dedupeKey, '1', { nx: true });
+  if (!claimed) {
+    log.warn('Duplicate trigger', { postId });
+    return;
+  }
+  try {
+    await redis.expire(dedupeKey, 3600);
+  } catch (err) {
+    log.warn('Failed to set expiration on dedup key', { error: (err as Error).message });
+  }
+
+  const flairId = await readSetting('lengthModFlairId', '');
+  const maxUnhostedLength = await readSetting('lengthModMaxUnhostedLength', 0);
+  const minHostedLength = await readSetting('lengthModMinHostedLength', 0);
+  const unhostedComment = await readSetting('lengthModMaxUnhostedComment', '');
+  const hostedComment = await readSetting('lengthModMinHostedComment', '');
+  const rawSignature = await readSetting('botSignature', '');
+  const signature = formatSignature(rawSignature);
+
+  const postBody = post.selftext ?? '';
+  const charCount = bodyLength(postBody);
+  const isLinkPost = !!post.url && post.url.startsWith('http');
+  const hasLinkUrl = containsLink(postBody);
+  const hasLinkContent = isLinkPost || hasLinkUrl;
+
+  const fullPost = await reddit.getPostById(postId);
+  const actualFlairMatch = flairId ? fullPost.flair?.templateId === flairId : false;
+
+  log.info('Length moderator triggered', {
+    postId,
+    charCount,
+    hasLinkContent,
+    actualFlairMatch,
+    postFlairId: fullPost.flair?.templateId,
+    configuredFlairId: flairId,
+  });
+
+  // Check 1: flair-gated max unhosted length
+  if (actualFlairMatch && maxUnhostedLength > 0 && charCount > maxUnhostedLength) {
+    log.info('Post exceeds max unhosted length', { postId, charCount, maxUnhostedLength });
+    await enforce(fullPost, postId, unhostedComment, signature, 'max-unhosted', log);
+    return;
+  }
+
+  // Check 2: posts with link min hosted length (no flair gate)
+  if (hasLinkContent && minHostedLength > 0 && charCount < minHostedLength) {
+    log.info('Post with link below min hosted length', { postId, charCount, minHostedLength });
+    await enforce(fullPost, postId, hostedComment, signature, 'min-hosted', log);
+  }
 }
 
 export const LENGTH_MOD_SETTINGS = {
