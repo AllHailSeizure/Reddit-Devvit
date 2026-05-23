@@ -27,6 +27,8 @@ const DEFAULTS: Record<string, string | number | boolean> = {
   mopToolEnabled: true,
   responseToolEnabled: true,
   defineCommandEnabled: true,
+  defineCommandCategory: 'physics, mathematics, and AI',
+  defineCommandSearchGrounding: true,
 };
 
 export async function readSetting<T extends string | number | boolean>(

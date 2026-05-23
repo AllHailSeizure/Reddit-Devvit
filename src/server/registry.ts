@@ -32,6 +32,7 @@ import './command-modules/define-command';
 import { register as registerMopTool } from './action-modules/mop-tool';
 import { register as registerResponseTool } from './action-modules/response-tool';
 import { register as registerQuotaViewer } from './action-modules/quota-viewer';
+import { register as registerBingoGame, captureCommentEvent, capturePostEvent, capturePostReportEvent, captureModActionEvent } from './action-modules/bingo-game';
 import { register as registerAdmin } from './admin';
 import { run as runDepthCapModerator } from './trigger-modules/depth-cap-moderator';
 import { run as runSelfResponseModerator } from './trigger-modules/self-response-moderator';
@@ -42,11 +43,11 @@ import { runQuotaCheck, runOnModAction as runFloodOnModAction, runOnPostDelete a
 
 const APP_INSTALL:    AppInstallHandler[]    = [];
 const APP_UPGRADE:    AppUpgradeHandler[]    = [];
-const POST_SUBMIT:    PostSubmitHandler[]    = [runOnPost, runQuotaCheck, runLengthModerator];
-const COMMENT_CREATE: CommentCreateHandler[] = [runOnComment, runDepthCapModerator, runSelfResponseModerator];
-const POST_REPORT:    PostReportHandler[]    = [runOnPostReport];
+const POST_SUBMIT:    PostSubmitHandler[]    = [runOnPost, runQuotaCheck, runLengthModerator, capturePostEvent];
+const COMMENT_CREATE: CommentCreateHandler[] = [runOnComment, runDepthCapModerator, runSelfResponseModerator, captureCommentEvent];
+const POST_REPORT:    PostReportHandler[]    = [runOnPostReport, capturePostReportEvent];
 const COMMENT_REPORT: CommentReportHandler[] = [runOnCommentReport];
-const MOD_ACTIONS:    ModActionsHandler[]    = [runFloodOnModAction];
+const MOD_ACTIONS:    ModActionsHandler[]    = [runFloodOnModAction, captureModActionEvent];
 const POST_DELETE:    PostDeleteHandler[]    = [runFloodOnPostDelete];
 const MOD_MAIL:       ModMailHandler[]       = [];
 
@@ -93,5 +94,6 @@ export function registerAll(app: Hono): void {
   registerMopTool(app);
   registerResponseTool(app);
   registerQuotaViewer(app);
+  registerBingoGame(app);
   registerAdmin(app);
 }
