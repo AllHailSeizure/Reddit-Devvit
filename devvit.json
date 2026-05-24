@@ -38,6 +38,7 @@
     "onAppInstall": "/internal/triggers/app-install",
     "onAppUpgrade": "/internal/triggers/app-upgrade",
     "onPostSubmit": "/internal/triggers/post-submit",
+    "onPostFlairUpdate": "/internal/triggers/post-flair-update",
     "onCommentCreate": "/internal/triggers/comment-create",
     "onPostReport": "/internal/triggers/post-report",
     "onCommentReport": "/internal/triggers/comment-report",
@@ -128,11 +129,11 @@
         "endpoint": "/internal/menu/create-bingo-post"
       },
       {
-        "label": "Inject Bingo Test Event",
-        "description": "Inject a test event for bingo validation (dev-only).",
+        "label": "Bingo Settings",
+        "description": "Configure and manage the bingo game.",
         "forUserType": "moderator",
         "location": "subreddit",
-        "endpoint": "/internal/menu/bingo-inject-event"
+        "endpoint": "/internal/menu/bingo-settings"
       }
     ]
   },
@@ -152,7 +153,7 @@
     "bot-settings-removal-messages": "/internal/forms/bot-settings-removal-messages",
     "quota-viewer-search":        "/internal/forms/quota-viewer-search",
     "quota-viewer-result":        "/internal/forms/quota-viewer-result",
-    "bingo-inject-event":         "/internal/forms/bingo-inject-event"
+    "bingo-settings":             "/internal/forms/bingo-settings"
   },
   "settings": {
     "global": {
