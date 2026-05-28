@@ -1,6 +1,6 @@
 {
   "name": "llmphysics-bot",
-  "version": "2.9.0.3",
+  "version": "2.11.0.1",
   "private": true,
   "scripts": {
     "build": "vite build",
@@ -26,6 +26,46 @@
     "vite": "^8.0.13"
   }
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

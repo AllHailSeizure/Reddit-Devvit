@@ -29,6 +29,10 @@ const DEFAULTS: Record<string, string | number | boolean> = {
   defineCommandEnabled: true,
   defineCommandCategory: 'physics, mathematics, and AI',
   defineCommandSearchGrounding: true,
+  bingoCronSchedule: '0 * * * *',
+  bingoFirstWinnerMessage: '🎉 **FIRST BINGO!** Congrats to u/{userId} for being the first to win!',
+  bingoBingoMessage: '✅ Bingo! u/{userId} got five in a row!',
+  bingoFullCardMessage: '⭐ FULL CARD! u/{userId} marked all 25 tiles! Incredible!',
   adversarialReviewerEnabled: false,
   adversarialReviewerFlairId: '',
 };
