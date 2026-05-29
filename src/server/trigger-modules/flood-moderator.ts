@@ -5,7 +5,30 @@ import { readSetting, formatSignature } from '../helpers/settings-helper';
 import { evaluateFloodStatus, trackPost, markPostModRemoved, markPostAutoRemoved, markPostDeleted } from '../helpers/redis-helper';
 import type { PostId, SettingDef } from '../types';
 
-const log = logger('flood-moderator');
+export const MODULE = {
+  name: 'flood-moderator', // reference implementation — see src/server/CLAUDE.md
+  type: 'trigger',
+  description: 'Per-user post quota with rolling time window. Removes posts that exceed the limit.',
+  triggers: ['onPostSubmit', 'onModAction', 'onPostDelete'],
+  redisKeys: [
+    'bot:flood:handled:{postId}',  // dedup — legacy key format, do not rename (live data)
+    'flood:post:{postId}',          // post hash shared with bingo — legacy key format
+    'flood:posts',                  // global sorted set — legacy key format
+  ],
+  settings: [
+    'floodModEnabled',
+    'floodAssistantMaxPosts',
+    'floodAssistantWindowHours',
+    'floodAssistantIgnoreModerators',
+    'floodAssistantIgnoreContributors',
+    'floodAssistantIgnoreAutoRemoved',
+    'floodAssistantIgnoreRemoved',
+    'floodAssistantIgnoreDeleted',
+    'floodAssistantResponse',
+  ],
+} as const;
+
+const log = logger(MODULE.name);
 
 export async function runQuotaCheck(event: OnPostSubmitRequest): Promise<void> {
   const post = event.post;
