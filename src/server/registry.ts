@@ -16,25 +16,25 @@ import type {
 } from './types';
 
 // ─── Trigger module imports ────────────────────────────────────────────────────
-// import { run as myModule } from './trigger-modules/my-module';
+import { runQuotaCheck, runOnModAction as runFloodOnModAction, runOnPostDelete as runFloodOnPostDelete } from './trigger-modules/flood-moderator';
 
 // ─── Command module imports ────────────────────────────────────────────────────
 // import './command-modules/my-command';
 
 // ─── Menu module imports ───────────────────────────────────────────────────────
-// import { register as registerMyModule } from './action-modules/my-module';
+import { register as registerQuotaViewer } from './action-modules/quota-viewer';
 
 // ─── Trigger arrays ────────────────────────────────────────────────────────────
 
 const APP_INSTALL:       AppInstallHandler[]      = [];
 const APP_UPGRADE:       AppUpgradeHandler[]      = [];
-const POST_SUBMIT:       PostSubmitHandler[]      = [];
+const POST_SUBMIT:       PostSubmitHandler[]      = [runQuotaCheck];
 const POST_FLAIR_UPDATE: PostFlairUpdateHandler[] = [];
 const COMMENT_CREATE:    CommentCreateHandler[]   = [];
 const POST_REPORT:       PostReportHandler[]      = [];
 const COMMENT_REPORT:    CommentReportHandler[]   = [];
-const MOD_ACTIONS:       ModActionsHandler[]      = [];
-const POST_DELETE:       PostDeleteHandler[]      = [];
+const MOD_ACTIONS:       ModActionsHandler[]      = [runFloodOnModAction];
+const POST_DELETE:       PostDeleteHandler[]      = [runFloodOnPostDelete];
 const MOD_MAIL:          ModMailHandler[]         = [];
 
 // ─── Dispatch ──────────────────────────────────────────────────────────────────
@@ -76,6 +76,6 @@ export function registerAll(app: Hono): void {
       return c.json<TriggerResponse>({ status: 'ok' });
     });
   }
-  // Menu modules — add one line per verified module:
-  // registerMyModule(app);
+  // Menu modules — one line per verified module:
+  registerQuotaViewer(app);
 }

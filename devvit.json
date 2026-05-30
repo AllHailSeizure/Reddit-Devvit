@@ -52,6 +52,21 @@
       }
     }
   },
+  "menu": {
+    "items": [
+      {
+        "label": "Flood Quota",
+        "description": "Check a user's flood quota status.",
+        "forUserType": "moderator",
+        "location": "subreddit",
+        "endpoint": "/internal/menu/quota-viewer"
+      }
+    ]
+  },
+  "forms": {
+    "quota-viewer-search": "/internal/forms/quota-viewer-search",
+    "quota-viewer-result": "/internal/forms/quota-viewer-result"
+  },
   "scripts": {
     "build": "npm run build"
   }
