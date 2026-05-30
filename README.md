@@ -1,4 +1,4 @@
-# llmphysics-bot  2.8.2 — Moderator Guide
+# llmphysics-bot  2.12.0 — Moderator Guide
 
 A modular moderation-assistance bot for [r/LLMPhysics](https://reddit.com/r/LLMPhysics), built on the [Devvit](https://developers.reddit.com/docs) platform.
 
@@ -29,9 +29,12 @@ Available via the **Mod Shield** icon on posts and comments:
     *   **Distinguish:** You have full control to toggle the distinguish status on your response.
     *   **Efficiency:** You can select to **lock the target comment** simultaneously when posting your response, saving you an extra step during rule enforcement.
 
+*   **Flood Quota** _(Subreddit overflow menu)_:
+    *   **What it does:** Look up any user's current post count against the flood quota, including which posts count toward the limit and when their next post opportunity opens.
+
 ---
 
-## 2. Settings Guide (v2.8.1)
+## 2. Settings Guide (v2.12.0)
 Moderators can manage all bot behaviors in the **Bot Settings** menu (found under the Subreddit header overflow menu). Settings are organized into five main categories:
 
 ### Modules
