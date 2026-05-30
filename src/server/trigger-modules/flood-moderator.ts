@@ -5,7 +5,30 @@ import { readSetting, formatSignature } from '../helpers/settings-helper';
 import { evaluateFloodStatus, trackPost, markPostModRemoved, markPostAutoRemoved, markPostDeleted } from '../helpers/redis-helper';
 import type { PostId, SettingDef } from '../types';
 
-const log = logger('flood-moderator');
+export const MODULE = {
+  name: 'flood-moderator', // reference implementation — see src/server/CLAUDE.md
+  type: 'trigger',
+  description: 'Per-user post quota with rolling time window. Removes posts that exceed the limit.',
+  triggers: ['onPostSubmit', 'onModAction', 'onPostDelete'],
+  redisKeys: [
+    'bot:flood:handled:{postId}',  // dedup — legacy key format, do not rename (live data)
+    'flood:post:{postId}',          // post hash shared with bingo — legacy key format
+    'flood:posts',                  // global sorted set — legacy key format
+  ],
+  settings: [
+    'floodModEnabled',
+    'floodAssistantMaxPosts',
+    'floodAssistantWindowHours',
+    'floodAssistantIgnoreModerators',
+    'floodAssistantIgnoreContributors',
+    'floodAssistantIgnoreAutoRemoved',
+    'floodAssistantIgnoreRemoved',
+    'floodAssistantIgnoreDeleted',
+    'floodAssistantResponse',
+  ],
+} as const;
+
+const log = logger(MODULE.name);
 
 export async function runQuotaCheck(event: OnPostSubmitRequest): Promise<void> {
   const post = event.post;
@@ -38,7 +61,7 @@ export async function runQuotaCheck(event: OnPostSubmitRequest): Promise<void> {
     log.warn('Failed to set expiration on dedup key', { dedupeKey, error: (err as Error).message });
   }
 
-  const [maxPosts, windowHours, ignoreModerators, ignoreContributors, ignoreAutoRemoved, ignoreRemoved, ignoreDeleted] = await Promise.all([
+  const [maxPosts, windowHours, ignoreModerators, ignoreContributors, ignoreAutoRemoved, ignoreRemoved, ignoreDeleted, enabled] = await Promise.all([
     readSetting('floodAssistantMaxPosts', 1),
     readSetting('floodAssistantWindowHours', 24),
     readSetting('floodAssistantIgnoreModerators', true),
@@ -46,6 +69,7 @@ export async function runQuotaCheck(event: OnPostSubmitRequest): Promise<void> {
     readSetting('floodAssistantIgnoreAutoRemoved', true),
     readSetting('floodAssistantIgnoreRemoved', true),
     readSetting('floodAssistantIgnoreDeleted', true),
+    readSetting('floodModEnabled', true),
   ]);
 
   log.info('Quota check started', { postId, authorName, subredditName, maxPosts, windowHours });
@@ -63,7 +87,8 @@ export async function runQuotaCheck(event: OnPostSubmitRequest): Promise<void> {
     return;
   }
 
-  // Check mod/contributor status — stored in the hash so evaluation never needs the Reddit API
+  // Check mod/contributor status now so it's stored in the post hash — future quota
+  // evaluations read from the hash and never need to call the Reddit API again.
   let isModerator = false;
   let isApprovedUser = false;
 
@@ -91,10 +116,8 @@ export async function runQuotaCheck(event: OnPostSubmitRequest): Promise<void> {
     log.error('Failed to track post in Redis', err, { postId, userId: user.id });
   }
 
-  // Enforcement gate. The enable switch lives HERE, not at the top, so disabling
-  // the flood moderator still tracks posts — the post hash is shared infrastructure
-  // that other modules (e.g. bingo) depend on. Only quota enforcement is toggled off.
-  const enabled = await readSetting('floodModEnabled', true);
+  // Enforcement gate lives here (not at the top) so disabling flood-moderator still
+  // tracks posts — the post hash is shared infrastructure other modules may read.
   if (!enabled) {
     log.info('Flood moderator disabled — post tracked, enforcement skipped', { postId });
     return;
@@ -144,15 +167,17 @@ export async function runQuotaCheck(event: OnPostSubmitRequest): Promise<void> {
     return;
   }
 
+  let removed = false;
   try {
     await reddit.remove(postId, false);
+    removed = true;
     log.info('Post removed', { postId, authorName });
   } catch (err) {
     log.error('Failed to remove post', err, { postId });
   }
 
   const responseText = await readSetting('floodAssistantResponse', '');
-  if (responseText) {
+  if (removed && responseText) {
     try {
       const rawSignature = await readSetting('botSignature', '');
       const notice = responseText + formatSignature(rawSignature);

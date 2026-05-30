@@ -1,11 +1,29 @@
 import type { Hono } from 'hono';
 import { reddit, redis } from '@devvit/web/server';
-import type { MenuItemRequest, UiResponse } from '@devvit/web/shared';
+import type { UiResponse } from '@devvit/web/shared';
 import { logger } from '../helpers/log-helper';
 import { readSetting } from '../helpers/settings-helper';
 import { evaluateFloodStatus } from '../helpers/redis-helper';
 
-const log = logger('quota-viewer');
+export const MODULE = {
+  name: 'quota-viewer',
+  type: 'action',
+  description: 'Moderator action to look up a user\'s current flood quota status.',
+  triggers: [],
+  redisKeys: ['bot:quotaviewer:session:{modName}'],
+  settings: [
+    'floodModEnabled',
+    'floodAssistantMaxPosts',
+    'floodAssistantWindowHours',
+    'floodAssistantIgnoreDeleted',
+    'floodAssistantIgnoreRemoved',
+    'floodAssistantIgnoreAutoRemoved',
+    'floodAssistantIgnoreModerators',
+    'floodAssistantIgnoreContributors',
+  ],
+} as const;
+
+const log = logger(MODULE.name);
 const SESSION_TTL = 300;
 
 type QuotaViewerSession = { targetUsername: string };
@@ -18,11 +36,6 @@ async function setSession(mod: string, data: QuotaViewerSession): Promise<void> 
   const key = sessionKey(mod);
   await redis.set(key, JSON.stringify(data));
   await redis.expire(key, SESSION_TTL);
-}
-
-async function getSession(mod: string): Promise<QuotaViewerSession | null> {
-  const raw = await redis.get(sessionKey(mod));
-  return raw ? (JSON.parse(raw) as QuotaViewerSession) : null;
 }
 
 export function register(app: Hono): void {
