@@ -1,4 +1,4 @@
-# llmphysics-bot  2.13.0 — Moderator Guide
+# llmphysics-bot  2.14.0 — Moderator Guide
 
 A modular moderation-assistance bot for [r/LLMPhysics](https://reddit.com/r/LLMPhysics), built on the [Devvit](https://developers.reddit.com/docs) platform.
 
@@ -34,7 +34,7 @@ Available via the **Mod Shield** icon on posts and comments:
 
 ---
 
-## 2. Settings Guide (v2.13.0)
+## 2. Settings Guide (v2.14.0)
 Moderators configure all bot settings via the **Reddit app installation settings page** at `https://developers.reddit.com/r/YOUR_SUBREDDIT/apps/llmphysics-bot`. Settings are grouped by module and take effect immediately.
 
 ### Module toggles

@@ -8,7 +8,7 @@ All notable changes to llmphysics-bot. Format: `module(<scope>): description`.
 
 - Engineering standards baseline: ESLint, Prettier, MODULE descriptor, structured logging standard, settings naming convention, Redis key convention, hierarchical CLAUDE.md files
 
-## [2.13.0] — settings platform migration + depth-cap-moderator
+## [2.14.0] — settings platform migration + depth-cap-moderator
 
 - `config(settings-platform)`: Migrate all module settings from Redis-backed admin forms to Devvit platform settings. Settings now managed via the Reddit app installation page. Removes 5 mod menu items (Module Toggles, Flood Settings, Comment Settings, Post Settings, Bot Messages). Fix all pre-existing ESLint errors.
 - `module(depth-cap-moderator)`: Locks comment chains exceeding the configured depth. Per-comment dedup guard; moderator and approved-submitter exemptions; custom response message; depth-1 regression guard. ✓ Verified
