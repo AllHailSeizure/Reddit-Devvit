@@ -17,6 +17,7 @@ import type {
 
 // ─── Trigger module imports ────────────────────────────────────────────────────
 import { runQuotaCheck, runOnModAction as runFloodOnModAction, runOnPostDelete as runFloodOnPostDelete } from './trigger-modules/flood-moderator';
+import { run as runDepthCapModerator } from './trigger-modules/depth-cap-moderator';
 
 // ─── Command module imports ────────────────────────────────────────────────────
 // import './command-modules/my-command';
@@ -30,7 +31,7 @@ const APP_INSTALL:       AppInstallHandler[]      = [];
 const APP_UPGRADE:       AppUpgradeHandler[]      = [];
 const POST_SUBMIT:       PostSubmitHandler[]      = [runQuotaCheck];
 const POST_FLAIR_UPDATE: PostFlairUpdateHandler[] = [];
-const COMMENT_CREATE:    CommentCreateHandler[]   = [];
+const COMMENT_CREATE:    CommentCreateHandler[]   = [runDepthCapModerator];
 const POST_REPORT:       PostReportHandler[]      = [];
 const COMMENT_REPORT:    CommentReportHandler[]   = [];
 const MOD_ACTIONS:       ModActionsHandler[]      = [runFloodOnModAction];
