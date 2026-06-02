@@ -1,29 +1,10 @@
 import type { Hono } from 'hono';
-import { reddit, redis } from '@devvit/web/server';
+import { reddit, redis, settings } from '@devvit/web/server';
 import type { UiResponse } from '@devvit/web/shared';
 import { logger } from '../helpers/log-helper';
-import { readSetting } from '../helpers/settings-helper';
 import { evaluateFloodStatus } from '../helpers/redis-helper';
 
-export const MODULE = {
-  name: 'quota-viewer',
-  type: 'action',
-  description: 'Moderator action to look up a user\'s current flood quota status.',
-  triggers: [],
-  redisKeys: ['bot:quotaviewer:session:{modName}'],
-  settings: [
-    'floodModEnabled',
-    'floodAssistantMaxPosts',
-    'floodAssistantWindowHours',
-    'floodAssistantIgnoreDeleted',
-    'floodAssistantIgnoreRemoved',
-    'floodAssistantIgnoreAutoRemoved',
-    'floodAssistantIgnoreModerators',
-    'floodAssistantIgnoreContributors',
-  ],
-} as const;
-
-const log = logger(MODULE.name);
+const log = logger('quota-viewer');
 const SESSION_TTL = 300;
 
 type QuotaViewerSession = { targetUsername: string };
@@ -41,8 +22,8 @@ async function setSession(mod: string, data: QuotaViewerSession): Promise<void> 
 export function register(app: Hono): void {
   // Menu item: open quota viewer
   app.post('/internal/menu/quota-viewer', async (c) => {
-    const enabled = await readSetting('floodModEnabled', true);
-    if (!enabled) return c.json<UiResponse>({ showToast: 'Flood Moderator is disabled.' });
+    const enabled = (await settings.get<boolean>('floodModEnabled')) ?? true;
+    if (!enabled) return c.json<UiResponse>({ showToast: { text: 'Flood Moderator is disabled. Enable it in bot settings.', appearance: 'neutral' } });
 
     const mod = (await reddit.getCurrentUsername()) ?? 'unknown';
     await setSession(mod, { targetUsername: '' });
@@ -86,13 +67,13 @@ export function register(app: Hono): void {
       await setSession(mod, { targetUsername: username });
 
       const [maxPosts, windowHours, ignoreDeleted, ignoreRemoved, ignoreAutoRemoved, ignoreModerators, ignoreContributors] = await Promise.all([
-        readSetting('floodAssistantMaxPosts', 1),
-        readSetting('floodAssistantWindowHours', 24),
-        readSetting('floodAssistantIgnoreDeleted', true),
-        readSetting('floodAssistantIgnoreRemoved', true),
-        readSetting('floodAssistantIgnoreAutoRemoved', true),
-        readSetting('floodAssistantIgnoreModerators', true),
-        readSetting('floodAssistantIgnoreContributors', true),
+        settings.get<number>('floodAssistantMaxPosts').then(v => v ?? 1),
+        settings.get<number>('floodAssistantWindowHours').then(v => v ?? 24),
+        settings.get<boolean>('floodAssistantIgnoreDeleted').then(v => v ?? true),
+        settings.get<boolean>('floodAssistantIgnoreRemoved').then(v => v ?? true),
+        settings.get<boolean>('floodAssistantIgnoreAutoRemoved').then(v => v ?? true),
+        settings.get<boolean>('floodAssistantIgnoreModerators').then(v => v ?? true),
+        settings.get<boolean>('floodAssistantIgnoreContributors').then(v => v ?? true),
       ]);
 
       const status = await evaluateFloodStatus(user.id, user.username, maxPosts, windowHours, {
