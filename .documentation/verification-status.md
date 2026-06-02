@@ -1,6 +1,6 @@
 # Verification Status
 
-_Last updated: 2026-06-01_
+_Last updated: 2026-06-02_
 _Devvit CLI: 0.12.24_
 
 ---
@@ -8,7 +8,7 @@ _Devvit CLI: 0.12.24_
 ## depth-cap-moderator
 
 **Last verified:** 2026-05-31 — VERIFIED ✓
-**Last promoted:** _(not yet promoted)_
+**Last promoted:** 2026-05-31 — v2.13.0
 **Module hash:** `36dcb4d44423294f6e9d4a234ea5e12a5fd670a1`
 **Test script hash:** `fbd3630c955f470177ef145b343a385da7383e27`
 **Devvit CLI at verify:** 0.12.24
@@ -35,7 +35,7 @@ _Devvit CLI: 0.12.24_
 ## flood-moderator
 
 **Last verified:** 2026-06-01 — VERIFIED ✓
-**Last promoted:** _(not yet promoted)_
+**Last promoted:** 2026-05-29 — v2.12.0
 **Module hash:** `b4419e6eefd7933d13f4f2c6beaa0d03c6934293`
 **Test script hash:** `c0ddacb2f28020572a6ecc0b2990a931acc49034`
 **Devvit CLI at verify:** 0.12.24
@@ -58,7 +58,7 @@ _Devvit CLI: 0.12.24_
 ## self-response-moderator
 
 **Last verified:** 2026-06-01 — VERIFIED ✓
-**Last promoted:** _(not yet promoted)_
+**Last promoted:** 2026-06-02 — v2.15.0
 **Module hash:** `a0d4ff036d79451825512f94a5e1326f68387a95`
 **Test script hash:** `ac8ca5f4f2dd64f0a4c4d6cc1a9d8194320e8e5f`
 **Devvit CLI at verify:** 0.12.24
@@ -78,7 +78,7 @@ _Devvit CLI: 0.12.24_
 ## length-moderator
 
 **Last verified:** 2026-06-01 — VERIFIED ✓
-**Last promoted:** _(not yet promoted)_
+**Last promoted:** 2026-06-02 — v2.15.0
 **Module hash:** `116a3b3315479a4899b653965cd8e78da7ce99cf`
 **Test script hash:** `f0082b82982c73a7fe936fafa75630ea80f270ae`
 **Devvit CLI at verify:** 0.12.24
@@ -101,7 +101,7 @@ _Devvit CLI: 0.12.24_
 ## report-moderator
 
 **Last verified:** 2026-05-31 — VERIFIED ✓
-**Last promoted:** _(not yet promoted)_
+**Last promoted:** 2026-06-02 — v2.15.0
 **Module hash:** `6fb1de14e36718434dc06c1b12e77d55f8351ee3`
 **Test script hash:** `c33f53091a89c07363ed0aa94913fec3654573b2`
 **Devvit CLI at verify:** 0.12.24
@@ -123,7 +123,7 @@ _Devvit CLI: 0.12.24_
 ## quota-viewer
 
 **Last verified:** _(pending)_
-**Last promoted:** _(not yet promoted)_
+**Last promoted:** 2026-06-02 — v2.15.0
 **Module hash:** _(pending)_
 **Test script hash:** _(pending — script not yet created)_
 **Devvit CLI at verify:** _(pending)_
@@ -133,7 +133,7 @@ _Devvit CLI: 0.12.24_
 ## mop-tool
 
 **Last verified:** _(pending)_
-**Last promoted:** _(not yet promoted)_
+**Last promoted:** 2026-06-02 — v2.15.0
 **Module hash:** _(pending)_
 **Test script hash:** _(pending — script not yet created)_
 **Devvit CLI at verify:** _(pending)_
@@ -143,7 +143,7 @@ _Devvit CLI: 0.12.24_
 ## response-tool
 
 **Last verified:** _(pending)_
-**Last promoted:** _(not yet promoted)_
+**Last promoted:** 2026-06-02 — v2.15.0
 **Module hash:** _(pending)_
 **Test script hash:** _(pending — script not yet created)_
 **Devvit CLI at verify:** _(pending)_
@@ -153,7 +153,7 @@ _Devvit CLI: 0.12.24_
 ## adversarial-reviewer
 
 **Last verified:** 2026-06-01 — VERIFIED ✓
-**Last promoted:** _(not yet promoted)_
+**Last promoted:** 2026-06-02 — v2.15.0
 **Module hash:** `67f680c6a5fa9cf601193d954e41b02cfde30666`
 **Test script hash:** `3299e06429f903f4a0f31bee78c5359daaaae118`
 **Devvit CLI at verify:** 0.12.24
@@ -173,7 +173,7 @@ _Devvit CLI: 0.12.24_
 ## define-command
 
 **Last verified:** _(pending)_
-**Last promoted:** _(not yet promoted)_
+**Last promoted:** 2026-06-02 — v2.15.0
 **Module hash:** _(pending)_
 **Test script hash:** _(pending — script not yet created)_
 **Devvit CLI at verify:** _(pending)_
