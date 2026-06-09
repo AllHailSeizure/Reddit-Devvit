@@ -1,6 +1,9 @@
 {
   "$schema": "https://developers.reddit.com/schema/config-file.v1.json",
   "name": "llmphysics-bot",
+  "marketingAssets": {
+    "icon": "assets/icon.png"
+  },
   "server": {
     "entry": "index.cjs"
   },
