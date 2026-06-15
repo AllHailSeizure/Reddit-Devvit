@@ -166,11 +166,16 @@ async function queueOrReview(
       await redis.zRem(ACTIVE_LOCKS_KEY, [postId as string]);
       return { showToast: { text: 'Gemini returned an empty review.', appearance: 'neutral' } };
     }
-    const rawSignature = (await settings.get<string>('botSignature')) ?? '';
-    const signature    = formatSignature(rawSignature);
-    const fullPost     = await reddit.getPostById(postId);
-    const comment      = await fullPost.addComment({ text: result.text + signature });
-    await comment.distinguish(true);
+    const [rawSignature, lockComment, stickyComment] = await Promise.all([
+      settings.get<string>('botSignature').then(v => v ?? ''),
+      settings.get<boolean>('adversarialReviewerLockComment').then(v => v ?? false),
+      settings.get<boolean>('adversarialReviewerStickyComment').then(v => v ?? false),
+    ]);
+    const signature = formatSignature(rawSignature);
+    const fullPost  = await reddit.getPostById(postId);
+    const comment   = await fullPost.addComment({ text: result.text + signature });
+    await comment.distinguish(stickyComment);
+    if (lockComment) { try { await comment.lock(); } catch (err) { log.warn('comment_lock_failed', { postId, error: (err as Error).message }); } }
     log.info('text_review_posted_via_form', { postId });
     if (subredditName.toLowerCase() === DEV_SUB) {
       await redis.del(dedupeKey);
@@ -422,11 +427,16 @@ export function register(app: Hono): void {
       return c.json<UiResponse>({ showToast: { text: 'Gemini returned an empty review.', appearance: 'neutral' } });
     }
 
-    const rawSignature = (await settings.get<string>('botSignature')) ?? '';
-    const signature    = formatSignature(rawSignature);
+    const [rawSignature, lockComment, stickyComment] = await Promise.all([
+      settings.get<string>('botSignature').then(v => v ?? ''),
+      settings.get<boolean>('adversarialReviewerLockComment').then(v => v ?? false),
+      settings.get<boolean>('adversarialReviewerStickyComment').then(v => v ?? false),
+    ]);
+    const signature = formatSignature(rawSignature);
     try {
       const comment = await fullPost.addComment({ text: result.text + signature });
-      await comment.distinguish(true);
+      await comment.distinguish(stickyComment);
+      if (lockComment) { try { await comment.lock(); } catch (err) { log.warn('comment_lock_failed', { postId, error: (err as Error).message }); } }
       log.info('Adversarial review posted', { postId, commentId: comment.id });
 
       // On the dev sub, release the dedup lock so the post can be re-reviewed
@@ -451,9 +461,13 @@ export function register(app: Hono): void {
     const supabaseKey = (await settings.get<string>('supabaseServiceRoleKey')) || '';
     if (!supabaseUrl || !supabaseKey) return c.json({ status: 'no supabase config' });
 
-    const rawSignature = (await settings.get<string>('botSignature')) ?? '';
-    const signature    = formatSignature(rawSignature);
-    const cutoff       = Date.now() - PDF_JOB_TTL_SECS * 1000;
+    const [rawSignature, lockComment, stickyComment] = await Promise.all([
+      settings.get<string>('botSignature').then(v => v ?? ''),
+      settings.get<boolean>('adversarialReviewerLockComment').then(v => v ?? false),
+      settings.get<boolean>('adversarialReviewerStickyComment').then(v => v ?? false),
+    ]);
+    const signature = formatSignature(rawSignature);
+    const cutoff    = Date.now() - PDF_JOB_TTL_SECS * 1000;
 
     // Get all pending postIds from the sorted set (score = enqueue timestamp).
     // zRange returns { member: string } objects in this Devvit version — extract member.
@@ -497,7 +511,8 @@ export function register(app: Hono): void {
             type FullPostDetails = { subredditName?: string };
             const subredditName = ((fullPost as typeof fullPost & FullPostDetails).subredditName) ?? '';
             const comment       = await fullPost.addComment({ text: job.result + signature });
-            await comment.distinguish(true);
+            await comment.distinguish(stickyComment);
+            if (lockComment) { try { await comment.lock(); } catch (err) { log.warn('comment_lock_failed', { postId, error: (err as Error).message }); } }
             log.info('PDF review posted', { postId, commentId: comment.id });
             // On the dev sub, release dedup lock so the post can be re-reviewed
             if (subredditName.toLowerCase() === DEV_SUB) {

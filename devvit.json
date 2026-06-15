@@ -102,8 +102,10 @@
     "quota-viewer-search":        "/internal/forms/quota-viewer-search",
     "quota-viewer-result":        "/internal/forms/quota-viewer-result",
     "bot-settings-adversarial":   "/internal/forms/bot-settings-adversarial",
-    "adversarial-no-link":        "/internal/forms/adversarial-no-link",
-    "adversarial-multi-link":     "/internal/forms/adversarial-multi-link"
+    "adversarial-no-link":                "/internal/forms/adversarial-no-link",
+    "adversarial-multi-link":             "/internal/forms/adversarial-multi-link",
+    "bot-settings-adversarial-reviewer":  "/internal/forms/bot-settings-adversarial-reviewer",
+    "bot-settings-commenting":            "/internal/forms/bot-settings-commenting"
   },
   "settings": {
     "global": {
@@ -149,6 +151,12 @@
         "type": "paragraph",
         "label": "Depth Cap Moderation — Depth cap triggered comment",
         "helpText": "Commented when a comment reaches theh maximum depth cap."
+      },
+      "depthCapReport": {
+        "type": "boolean",
+        "label": "Depth Cap — Submit report to mod queue",
+        "helpText": "Submit the triggered comment as a report when the depth cap fires. Disable to prevent mod queue clogging.",
+        "defaultValue": true
       },
       "floodAssistantResponse": {
         "type": "paragraph",
@@ -317,6 +325,18 @@
         "type": "string",
         "label": "Adversarial Reviewer — Required flair template ID",
         "helpText": "If set, only posts with this flair can request a review. Leave blank to allow any post."
+      },
+      "adversarialReviewerStickyComment": {
+        "type": "boolean",
+        "label": "Adversarial Reviewer — Sticky review comment",
+        "helpText": "Sticky the review comment to the top of the post after posting.",
+        "defaultValue": false
+      },
+      "adversarialReviewerLockComment": {
+        "type": "boolean",
+        "label": "Adversarial Reviewer — Lock review comment",
+        "helpText": "Lock the review comment after posting.",
+        "defaultValue": false
       }
     }
   },

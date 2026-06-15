@@ -89,9 +89,10 @@ export async function run(event: OnCommentCreateRequest): Promise<void> {
     }
   }
 
-  const [rawSignature, depthCapResponse] = await Promise.all([
+  const [rawSignature, depthCapResponse, submitReport] = await Promise.all([
     settings.get<string>('botSignature').then(v => v ?? ''),
     settings.get<string>('depthCapResponse').then(v => v ?? ''),
+    settings.get<boolean>('depthCapReport').then(v => v ?? true),
   ]);
   const noticeBody = depthCapResponse || 'This comment has reached the maximum comment depth and locked.';
   const notice = (noticeBody || 'Depth cap reached.') + formatSignature(rawSignature);
@@ -120,10 +121,12 @@ export async function run(event: OnCommentCreateRequest): Promise<void> {
 
   if (!deepest.locked) await deepest.lock();
 
-  try {
-    await reddit.report(deepest, { reason: 'Depth cap trigger' });
-  } catch (err) {
-    log.warn('report_failed', { error: (err as Error).message });
+  if (submitReport) {
+    try {
+      await reddit.report(deepest, { reason: 'Depth cap trigger' });
+    } catch (err) {
+      log.warn('report_failed', { error: (err as Error).message });
+    }
   }
 
   await logZSet(CAP_LOG_KEY, { action: 'Depth cap trigger', commentId: cv2.id, cap }, CAP_LOG_MAX);
