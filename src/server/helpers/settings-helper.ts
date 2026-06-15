@@ -1,32 +1,9 @@
 import { redis } from '@devvit/web/server';
 
 const DEFAULTS: Record<string, string | number | boolean> = {
-  botSignature: 'I am a bot. This action was performed automatically. Contact the moderators if you have questions.',
-  depthCapModEnabled: true,
-  depthCap: 10,
-  depthCapResponse: '',
-  floodModEnabled: true,
-  floodAssistantResponse: '',
-  floodAssistantMaxPosts: 1,
-  floodAssistantWindowHours: 24,
-  floodAssistantIgnoreModerators: true,
-  floodAssistantIgnoreContributors: true,
-  floodAssistantIgnoreAutoRemoved: true,
-  floodAssistantIgnoreRemoved: true,
-  floodAssistantIgnoreDeleted: true,
-  selfResponseModEnabled: true,
-  selfResponseResponse: '',
-  selfResponseIgnoreModerators: true,
-  selfResponseIgnoreContributors: true,
-  lengthModEnabled: true,
-  lengthModFlairId: '',
-  lengthModMaxUnhostedLength: 0,
-  lengthModMinHostedLength: 0,
-  lengthModMaxUnhostedComment: '',
-  lengthModMinHostedComment: '',
-  mopToolEnabled: true,
-  responseToolEnabled: true,
-  defineCommandEnabled: true,
+  bingoFirstWinnerMessage: '🎉 **FIRST BINGO!** Congrats to u/{userId} for being the first to win!',
+  bingoBingoMessage: '✅ Bingo! u/{userId} got five in a row!',
+  bingoFullCardMessage: '⭐ FULL CARD! u/{userId} marked all 25 tiles! Incredible!',
 };
 
 export async function readSetting<T extends string | number | boolean>(
@@ -34,7 +11,7 @@ export async function readSetting<T extends string | number | boolean>(
   defaultValue: T,
 ): Promise<T> {
   const raw = await redis.get(`settings:${key}`);
-  if (raw == null) return defaultValue;
+  if (raw === null || raw === undefined) return defaultValue;
   if (typeof defaultValue === 'number') return Number(raw) as T;
   if (typeof defaultValue === 'boolean') return (raw === 'true') as T;
   return raw as T;

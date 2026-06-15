@@ -1,15 +1,33 @@
-import { reddit, redis } from '@devvit/web/server';
+import { reddit, redis, settings } from '@devvit/web/server';
 import type { OnCommentCreateRequest } from '@devvit/web/shared';
 import { logger, logZSet } from '../helpers/log-helper';
-import { readSetting, formatSignature } from '../helpers/settings-helper';
+import { formatSignature } from '../helpers/settings-helper';
 import type { CommentId, SettingDef } from '../types';
 
-const log = logger('self-response-moderator');
+export const MODULE = {
+  name: 'self-response-moderator',
+  type: 'trigger',
+  description: 'Removes and locks top-level comments where the commenter is the post author.',
+  triggers: ['onCommentCreate'],
+  redisKeys: [
+    'bot:srmod:handled:{commentId}',
+    'bot:srmod:log',
+  ],
+  settings: [
+    'selfResponseModEnabled',
+    'selfResponseIgnoreModerators',
+    'selfResponseIgnoreContributors',
+    'selfResponseResponse',
+    'botSignature',
+  ],
+} as const;
+
+const log = logger(MODULE.name);
 const SRM_LOG_KEY = 'bot:srmod:log';
 const SRM_LOG_MAX = 200;
 
 export async function run(event: OnCommentCreateRequest): Promise<void> {
-  const enabled = await readSetting('selfResponseModEnabled', true);
+  const enabled = (await settings.get<boolean>('selfResponseModEnabled')) ?? true;
   if (!enabled) return;
 
   const cv2 = event.comment;
@@ -31,21 +49,20 @@ export async function run(event: OnCommentCreateRequest): Promise<void> {
     log.warn('Failed to set expiration on dedup key', { dedupeKey, expireSeconds: 3600, error: (err as Error).message });
   }
 
-  const ignoreModerators = await readSetting('selfResponseIgnoreModerators', true);
-  const ignoreContributors = await readSetting('selfResponseIgnoreContributors', true);
+  const [ignoreModerators, ignoreContributors] = await Promise.all([
+    settings.get<boolean>('selfResponseIgnoreModerators').then(v => v ?? true),
+    settings.get<boolean>('selfResponseIgnoreContributors').then(v => v ?? true),
+  ]);
 
   if ((ignoreModerators || ignoreContributors) && event.author?.name && event.subreddit?.name) {
     const subredditName = event.subreddit.name;
     const authorName = event.author.name;
     try {
       if (ignoreModerators) {
-        const user = await reddit.getUserByUsername(authorName);
-        if (user) {
-          const modPerms = await user.getModPermissionsForSubreddit(subredditName);
-          if (modPerms.length > 0) {
-            log.info('Comment ignored (moderator)', { commentId: cv2.id, username: authorName });
-            return;
-          }
+        const mods = await reddit.getModerators({ subredditName, username: authorName }).all();
+        if (mods.length > 0) {
+          log.info('Comment ignored (moderator)', { commentId: cv2.id, username: authorName });
+          return;
         }
       }
       if (ignoreContributors) {
@@ -64,9 +81,11 @@ export async function run(event: OnCommentCreateRequest): Promise<void> {
 
   const comment = await reddit.getCommentById(cv2.id as CommentId);
 
-  const selfResponseResponse = await readSetting('selfResponseResponse', '');
+  const [selfResponseResponse, rawSignature] = await Promise.all([
+    settings.get<string>('selfResponseResponse').then(v => v ?? ''),
+    settings.get<string>('botSignature').then(v => v ?? ''),
+  ]);
   if (selfResponseResponse) {
-    const rawSignature = await readSetting('botSignature', '');
     const notice = selfResponseResponse + formatSignature(rawSignature);
     try {
       const reply = await comment.reply({ text: notice });

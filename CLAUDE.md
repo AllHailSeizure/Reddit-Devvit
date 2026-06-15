@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Commands
 
 ```bash
-npm run build        # compile TypeScript → dist/server/index.js (must run before playtest)
+npm run build        # compile TypeScript → dist/server/index.cjs + dist/client/ (Vite)
 devvit playtest r/llmphysics_dev   # upload bundle and stream logs (does NOT auto-build)
 ```
 
@@ -95,6 +95,62 @@ import { register as registerMyModule } from './action-modules/my-module';
 
 // Command module
 import './command-modules/my-command';   // side-effect — runs registerCommand() at module scope
+```
+
+**Action modules also require `devvit.json` entries** for the menu item to appear and the form callback to work. Add one object to `menu.items` (with `label`, `description`, `forUserType`, `location`, `endpoint`) and one key-value pair to `forms` (name → Hono route path).
+
+### Custom Post Type (Webview) Modules
+
+Modules that render a React webview in a post (e.g. bingo card, interactive game) follow this 4-touch pattern:
+
+**1. Client files** (`src/client/`)
+```
+src/client/
+  ├── splash.html / splash.tsx   # inline (feed) view
+  └── game.html / game.tsx        # expanded view (optional)
+```
+Each `.html` is a minimal shell that loads the corresponding `.tsx`:
+```html
+<div id="root"></div>
+<script type="module" src="./splash.tsx"></script>
+```
+`.tsx` files use `@devvit/web/client` for navigation (`requestExpandedMode`) and `@devvit/web/server` on the server for data APIs (via plain `fetch()`).
+
+**2. Server routes** (`src/server/action-modules/my-module.ts`)
+```typescript
+export function register(app: Hono): void {
+  app.get('/api/my-data', async (c) => { /* fetch data */ });
+  app.post('/internal/menu/create-my-post', async (c) => {
+    await reddit.submitCustomPost({ title: '...', entry: 'default' });
+    return c.json({ showToast: { text: 'Posted!', appearance: 'success' } });
+  });
+}
+```
+The `entry` parameter in `submitCustomPost()` must match a key in `devvit.json` `post.entrypoints` (usually `"default"` for inline).
+
+**3. devvit.json entries**
+```json
+"post": {
+  "dir": "dist/client",
+  "entrypoints": {
+    "default": { "entry": "splash.html", "inline": true, "height": "regular" },
+    "game": { "entry": "game.html", "height": "tall" }
+  }
+},
+"menu": {
+  "items": [{
+    "label": "Create My Post",
+    "forUserType": "moderator",
+    "location": "subreddit",
+    "endpoint": "/internal/menu/create-my-post"
+  }]
+}
+```
+
+**4. Register in `registry.ts`**
+```typescript
+import { register as registerMyModule } from './action-modules/my-module';
+// inside registerAll(): registerMyModule(app);
 ```
 
 ---
@@ -348,12 +404,11 @@ When adding a new platform-level setting (secret or app-install-time), add it to
 
 ## Devvit Platform: Hard-Won Knowledge
 
-**esbuild — no `--external` flags.** The platform does not expose packages at runtime. Bundle everything:
-```
-esbuild src/server/index.ts --bundle --platform=node --format=cjs --outfile=dist/server/index.js
-```
+**Vite bundles everything into CommonJS.** The platform requires the server entry (`dist/server/index.cjs`) to be CommonJS. The `@devvit/start/vite` plugin handles this automatically. Do not use ESM syntax in the server code.
 
-**`createServer` from `@devvit/server`, not `serve` from `@hono/node-server`.** The Devvit version no-ops `listen()` during bundle evaluation to prevent port-binding failures. `serve()` will crash.
+**No `--external` flags during bundling.** The platform does not expose packages at runtime. Vite bundles all dependencies into the server output.
+
+**Client webview has CSP restrictions.** The iframe sandbox allows only `fetch()` calls back to the app's own server. External API calls must go through server-side routes (e.g., `/api/external-data` → `fetch()` to external API on the server).
 
 **The HTTP server runs in the cloud**, not locally. `devvit playtest` uploads the compiled bundle; the platform executes it. Port 5678 / the VS Code devtunnel is only the live-reload WebSocket (started with `--connect`).
 
