@@ -4,8 +4,6 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ---
 
-Parked ideas and future concepts: see [ideas.md](ideas.md).
-
 ## Commands
 
 ```bash
@@ -19,6 +17,18 @@ https://www.reddit.com/r/llmphysics_dev/?playtest=llmphysics-bot
 ```
 
 There is no test runner. Validation is done manually via `devvit logs` during playtest.
+
+---
+
+## System Prompt
+
+The adversarial reviewer system prompt lives in Supabase Storage at `config/system_prompt.txt`. Edit `.documentation/adversarial_review_prompt.txt`, then push:
+
+```bash
+npx supabase storage cp .documentation/adversarial_review_prompt.txt ss:///config/system_prompt.txt --experimental
+```
+
+No rebuild or redeploy required — the edge function reads it fresh on each invocation.
 
 ---
 
