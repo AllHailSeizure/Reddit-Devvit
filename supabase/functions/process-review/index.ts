@@ -3,15 +3,16 @@
  *
  * Triggered by a Supabase Database Webhook on INSERT to the review_jobs table.
  * Downloads the PDF from the source URL, uploads it to the Gemini Files API,
- * and generates a physics review. Falls back to text-only if PDF processing fails.
+ * and generates a physics review. Falls back to text-only if PDF processing fails
+ * or if pdf_url is null (text-only job).
  *
  * Timeout tiers: Free plan = 60s, Pro plan = 150s.
  * Files API approach keeps each step bounded:
  *   PDF download: 2–8s | Upload: 2–8s | Poll ACTIVE: 1–5s | Generate: 5–20s
  *   Typical total: 10–40s — comfortable within 60s free tier.
  *
- * SYSTEM_PROMPT must be kept in sync with:
- *   llmphysics-bot/src/server/action-modules/adversarial-reviewer.ts
+ * System prompt is read from the bot_config table (key = 'system_prompt') at
+ * startup. Falls back to a hardcoded literal if the row is missing.
  */
 
 const GEMINI_PRIMARY_API = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent';
@@ -28,9 +29,11 @@ const URL_CONTEXT_PROMPT =
   `3. If filenames are ambiguous, return the direct link to the largest PDF file.\n\n` +
   `Return ONLY the raw string of the direct download URL. No markdown, no explanation, no choices.`;
 
-// ─── System prompt — keep in sync with adversarial-reviewer.ts ───────────────
+// ─── System prompt fallback (used if bot_config row is missing) ──────────────
+// The live prompt lives in Supabase: SELECT value FROM bot_config WHERE key = 'system_prompt'
+// Edit that row to update the prompt without redeploying.
 
-const SYSTEM_PROMPT =
+const SYSTEM_PROMPT_FALLBACK =
   `You are an expert, objective physics peer reviewer evaluating submissions for a Reddit community. Your task is to provide a concise, high-level, and rigorous critique of the provided text.\n\n` +
   `### Output Format Requirements\n` +
   `- **Title**: Begin exactly with: ## Adversarial Review of [Insert Paper Title or Core Topic] — *by [Model Name & version (eg Gemini 3.5 Flash)]*\n` +
@@ -197,6 +200,21 @@ Deno.serve(async (req: Request) => {
   const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
   const geminiKey   = Deno.env.get('GEMINI_API_KEY')!;
 
+  // Fetch system prompt from Supabase Storage; fall back to hardcoded literal if missing.
+  // To update: npx supabase storage cp .documentation/adversarial_review_prompt.txt ss:///config/system_prompt.txt --experimental
+  let SYSTEM_PROMPT = SYSTEM_PROMPT_FALLBACK;
+  try {
+    const res = await fetch(`${supabaseUrl}/storage/v1/object/public/config/system_prompt.txt`);
+    if (res.ok) {
+      const text = (await res.text()).trim();
+      if (text) { SYSTEM_PROMPT = text; console.log('system_prompt loaded from storage'); }
+    } else {
+      console.warn(`storage fetch failed (${res.status}) — using fallback system prompt`);
+    }
+  } catch (err) {
+    console.warn(`storage fetch threw — using fallback system prompt: ${(err as Error).message}`);
+  }
+
   // Respond immediately — webhook does not need to wait for processing
   // (Supabase Edge Functions keep running after the response is sent)
   const response = new Response('OK', { status: 200 });
@@ -211,6 +229,7 @@ Deno.serve(async (req: Request) => {
     // The Files API lets Gemini unpack and index the PDF asynchronously before the
     // generateContent call. This avoids timeout — the heavy work (PDF parsing) is done
     // by the time we ask for the review.
+    // When pdf_url is null the post has no manuscript link; skip straight to text-only.
     if (pdfUrl) {
       try {
         // Step 0: Resolve landing pages to a direct PDF download URL.
@@ -356,7 +375,8 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    // ── Text-only fallback ────────────────────────────────────────────────────
+    // ── Text-only path ───────────────────────────────────────────────────────
+    // Runs when: (a) pdf_url is null (text-only job), or (b) PDF path failed.
     if (!resultText) {
       const truncatedBody = (body ?? '').slice(0, BODY_CHAR_LIMIT);
       const buildTextPayload = (model: string) => JSON.stringify({

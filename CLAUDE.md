@@ -20,6 +20,18 @@ There is no test runner. Validation is done manually via `devvit logs` during pl
 
 ---
 
+## System Prompt
+
+The adversarial reviewer system prompt lives in Supabase Storage at `config/system_prompt.txt`. Edit `.documentation/adversarial_review_prompt.txt`, then push:
+
+```bash
+npx supabase storage cp .documentation/adversarial_review_prompt.txt ss:///config/system_prompt.txt --experimental
+```
+
+No rebuild or redeploy required — the edge function reads it fresh on each invocation.
+
+---
+
 ## Live Observability
 
 Two MCP tools are available for live observation during development and testing. Use them instead of reading log files or guessing state.
@@ -76,23 +88,7 @@ The project uses **Vite** (via `@devvit/start/vite`) to build both the Node.js s
 
 ## MVP-First Development
 
-**Always start with the minimal viable version and test it works before adding layers of complexity.**
-
-When the user describes a feature with multiple moving parts, the temptation is to build the whole thing at once. Don't. This creates blind spots: if something breaks, you can't isolate whether it's the backend API, the data layer, the frontend, or the integration.
-
-**Better approach:**
-1. Identify the core mechanism (e.g., "fetch a bingo card and render it")
-2. Build *only* that — with hardcoded/stub data if needed
-3. Test and confirm it works end-to-end
-4. Only then add the next layer (real data generation, marking, persistence, etc.)
-
-**In plan mode:**
-- After understanding the user's vision, explicitly propose a phased approach
-- Get agreement on what Phase 1 (MVP) is: "Phase 1: test that we can fetch and render a card. Phase 2: add marking logic. Phase 3: add win detection"
-- Write this into the plan before starting
-- Do not move to Phase 2 until Phase 1 is tested and working
-
-**Example of what went wrong:** Built full card generation → scheduler → API routes → React webview → Vite bundling all at once. When the UI didn't load, couldn't tell if it was the card generation, the API, the CSP sandbox, the week key, or the React build. Should have tested "does `/api/bingo/state?weekKey=2026-W20` return a card?" with curl first.
+Build the minimal core first, confirm it works end-to-end, then add the next layer. Propose explicit phases in plan mode and get agreement before moving on. Never build backend + data layer + frontend + scheduler all at once — if something breaks you can't isolate where.
 
 ---
 
@@ -119,11 +115,11 @@ Reddit events → `devvit.json` → `POST /internal/triggers/<slug>` → `regist
 Every trigger module checks its enabled flag as its **first line** and returns early if off:
 
 ```typescript
-const enabled = await readSetting('myModEnabled', true);
+const enabled = (await settings.get<boolean>('myModEnabled')) ?? true;
 if (!enabled) return;
 ```
 
-Naming convention: `<camelCasePrefix>Enabled` (e.g. `depthCapModEnabled`, `floodModEnabled`, `selfResponseModEnabled`, `lengthModEnabled`). Add the key to `DEFAULTS` in `settings-helper.ts` (default `true`) and a `boolean` field in `admin.ts`.
+Naming convention: `<camelCasePrefix>Enabled` (e.g. `depthCapModEnabled`, `floodModEnabled`). Declare in `devvit.json` under `settings.subreddit` with `"type": "boolean"` and `"defaultValue": true`.
 
 ### Adding a module (2 lines in `registry.ts`)
 
@@ -207,11 +203,9 @@ Runtime settings are stored in Redis under `settings:<key>`. All reads/writes go
 - `readAllSettings()` — reads every key in `DEFAULTS`
 - `formatSignature(raw)` — superscripts each word and prepends `---`; returns `''` on empty input
 
-**Two-tier settings system:** **Redis settings** (`helpers/settings-helper.ts`) store most runtime configuration under `settings:<key>` and are read/written via `readSetting()` / `writeSetting()`. **Platform settings** (declared in `devvit.json` under `settings.global` or `settings.subreddit`) are accessed via `import { settings } from '@devvit/web/server'` → `settings.get<string>('key')` and are managed by the Devvit platform (encrypted for secrets, editable in Developer Portal). Example: `geminiApiKey` is a platform secret; module enable flags are Redis settings.
+**Settings** are declared in `devvit.json` under `settings.subreddit` (mod-editable via the Reddit Developer Portal installation page) or `settings.global` (secrets like `geminiApiKey`). Read via `import { settings } from '@devvit/web/server'` → `(await settings.get<T>('key')) ?? defaultValue`.
 
-**Adding a new Redis setting:** add it to `DEFAULTS` in `settings-helper.ts`, then add the form field in `settings-registry.ts` (which exports `SETTINGS_MENUS` consumed by `admin.ts`). Adding a new admin UI settings group also requires updating `SETTINGS_MENUS` in `settings-registry.ts`.
-
-The `admin.ts` settings form is a two-route pair: `POST /internal/menu/bot-settings-<group>` returns `showForm`, and `POST /internal/forms/bot-settings-<group>` saves submitted values. This pattern is reused by all action modules.
+**Adding a new setting:** add a key to `devvit.json` `settings.subreddit` with `type`, `label`, `helpText`, and `defaultValue`. Then read it in the module with `settings.get<T>()`. No other files need to change.
 
 ---
 
@@ -260,16 +254,3 @@ All levels write to console (visible via `devvit logs`). Each level is also pers
 
 **NEVER auto-bump the version to work around deployment errors.** If `devvit playtest` fails with "AppVersion already exists," ask first before changing `package.json` version. The issue is usually environmental (lingering process, platform state) and will resolve itself or needs manual investigation — not a version bump band-aid.
 
----
-
-## Parked Idea: Shared Post-Tracker Module
-
-**Status:** parked — not built. Revisit only if a third module needs heavy post-state access.
-
-The `flood:post:{postId}` hash (`helpers/redis-helper.ts`) records per-post data — author, timestamp, mod-removal/deletion flags, and a bingo `gameId` stamp. It is created and TTL'd by the flood moderator's `trackPost()`, and bingo piggybacks on it (`tagPostWithGame` / `getPostGameId`).
-
-The idea: promote this into a dedicated **post-tracker trigger module** — a "shipping yard" that subscribes to `post-submit` / `mod-action` / `post-delete` itself, owns the post hash's entire lifecycle, and exposes it as neutral shared infrastructure. The flood moderator would shrink to pure quota policy.
-
-**Why it's parked, not done:** with only two consumers it would be designing for a hypothetical. The hash is also not actually a neutral post record — every field (`isModerator`, `isApprovedUser`, `is*Removed`, `isUserDeleted`) exists because flood's quota ignore-flags need it. A "neutral" tracker owning a flood-shaped record is a slightly false abstraction. The current proportionate fix instead: post-concept symbols renamed to be post-centric (`trackPost`, `postKey`, `POSTS_KEY`), and `tagPostWithGame()` sets its own TTL so whichever module creates the hash owns its expiry.
-
-**When to revisit:** a new module that depends heavily on post state would make the shared owner worth building. At that point the tracker becomes proportionate rather than speculative.

@@ -7,41 +7,15 @@ import { writeSetting, formatSignature } from '../helpers/settings-helper';
 
 const log = logger('adversarial-reviewer');
 
-const GEMINI_PRIMARY_API  = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent';
-const GEMINI_FALLBACK_API = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent';
-const BODY_CHAR_LIMIT     = 8000;
 const DEDUPE_TTL_SECS     = 60 * 60 * 24 * 7; // 7 days
 const USER_QUOTA_TTL_SECS = 60 * 60 * 25;      // 25 hrs — spans a full UTC day with margin
 const DEV_SUB             = 'llmphysics_dev';  // dedup lock released after each review here
 const PENDING_JOBS_KEY    = 'bot:adversarial:pdfjobs';
+const RETRY_QUEUE_KEY     = 'bot:adversarial:retry-queue'; // sorted set: score=retry-at ms, member=JSON
 const ACTIVE_LOCKS_KEY    = 'bot:adversarial:active-locks'; // sorted set: member=postId, score=expiry ms
 const PDF_JOB_TTL_SECS    = 60 * 60;           // 1 hour — give up on stale jobs
-
-// ─── Shared system prompt ─────────────────────────────────────────────────────
-// Keep in sync with supabase/functions/process-review/index.ts
-
-export const SYSTEM_PROMPT =
-  `You are an expert, objective physics peer reviewer evaluating submissions for a Reddit community. Your task is to provide a concise, high-level, and rigorous critique of the provided text.\n\n` +
-  `### Output Format Requirements\n` +
-  `- **Title**: Begin exactly with: ## Adversarial Review of [Insert Paper Title or Core Topic] — *by [Model Name & version (eg Gemini 3.5 Flash)]*\n` +
-  `- **Structure**: Use clean markdown headers, bold bullet points, and inline code blocks for mathematical equations, units, or variables (e.g., \`ρ = m/V\` or \`F_b = ρ × V × g\`).\n` +
-  `- **Tone**: Maintain a neutral, robotic, and strictly objective academic tone. Completely omit introductory filler ("Here is my review...") and concluding remarks.\n\n` +
-  `### Review Guidelines\n\n` +
-  `1. **Core Critique**: Identify and highlight fundamental methodological, mathematical, or structural flaws. Do not parrot generic category names; generate unique, descriptive headers for each specific flaw discovered in the text. Evaluate the paper against:\n` +
-  `   - Real-world grounding, quantitative frameworks, and testable predictions.\n` +
-  `   - Internal logical consistency and dimensional alignment.\n` +
-  `   - Avoidance of "jargon sheen" (using advanced terms like quantum, metrics, or tensors without mathematical backing) or "physics woo" (conflating mathematical abstractions with metaphysical or philosophical concepts).\n` +
-  `   - Attempting to solve an artificial or non-existent problem.\n` +
-  `   - Numerology: identifying numerical coincidences or pattern-fitted constants and presenting them as physically meaningful without deriving them from first principles or a causal mechanism.\n\n` +
-  `2. **Common Misconceptions**: Evaluate if the text commits foundational errors regarding common physics principles.\n` +
-  `   - *Strict Rule*: Do not force-fit a misconception. If the author uses a word like "observe" or "theory" correctly or casually, do not manufacture a critique.\n` +
-  `   - *Strict Rule*: Never list a misconception simply to state it was absent or missing. If the text does not commit a common misconception, omit this section entirely.\n` +
-  `   - Key examples to look out for:\n` +
-  `     - *The Observer Effect*: Confusing physical interaction via a measurement apparatus with human consciousness, awareness, or subjective experience.\n` +
-  `     - *Theory vs. Hypothesis*: Treating an unverified, speculative conjecture as a scientifically established, tested framework.\n` +
-  `     - *Math vs. Metaphor*: Substituting analogy or imagery for mathematical rigor. Metaphor is a legitimate pedagogical tool — the problem arises when a metaphor is constructed first and mathematics is then fitted afterward to justify it, rather than mathematics driving the conclusion. Flag cases where the explanatory chain runs imagery → fitted equation rather than derivation → insight.\n\n` +
-  `3. **Technical Feedback**: Correct explicit misunderstandings of standard physics terminology, values, or governing laws (e.g., thermodynamics, conservation laws, field mechanics). Target the logical and structural gaps in the math or definitions provided.\n\n` +
-  `4. **Probing Questions**: Conclude the review with 1-2 highly specific, probing questions targeting the foundational mechanics of the author's claims. These must demand explicit operational definitions or verifiable calculations, structured so they cannot be answered by feeding the prompt back into an LLM.`;
+const RETRY_DELAY_MS      = 15 * 60 * 1000;    // 15 minutes between retry attempts
+const MAX_RETRY_ATTEMPTS  = 3;                  // give up after 3 failed attempts
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -85,105 +59,43 @@ async function fetchWithLogging(url: string, options: RequestInit = {}): Promise
   }
 }
 
-// ─── Text-only Gemini call ────────────────────────────────────────────────────
-
-async function callGemini(title: string, body: string, apiKey: string): Promise<{ text: string; model: string } | null> {
-  const truncatedBody = body.length > BODY_CHAR_LIMIT
-    ? body.slice(0, BODY_CHAR_LIMIT) + '\n[...truncated]'
-    : body;
-
-  const buildPayload = (model: string) => JSON.stringify({
-    contents: [{ parts: [{ text: `${SYSTEM_PROMPT}\n\nYour model designation for the title is: ${model}\n\n---\n\nPost title: ${title}\n\nPost body:\n${truncatedBody || '(no body — title only)'}` }] }],
-    generationConfig: { temperature: 0.6 },
-  });
-
-  const opts = (payload: string): RequestInit => ({
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
-    body: payload,
-  });
-
-  let model = 'Gemini 3.5 Flash';
-  let res = await fetchWithLogging(GEMINI_PRIMARY_API, opts(buildPayload(model)));
-  if (res.status === 429 || res.status === 503) {
-    log.info('Gemini 3.5 unavailable, falling back to 3.1', { status: res.status });
-    model = 'Gemini 3.1 Flash Lite';
-    res = await fetchWithLogging(GEMINI_FALLBACK_API, opts(buildPayload(model)));
-  }
-  if (!res.ok) throw new Error(`Gemini API ${res.status}`);
-
-  type GeminiResponse = {
-    candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
-  };
-  const data = await res.json() as GeminiResponse;
-  const text = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-  return text ? { text, model } : null;
-}
-
 // ─── Shared form helper ───────────────────────────────────────────────────────
 
 type PendingForm = { postId: PostId; title: string; body: string; subredditName: string };
 
 async function queueOrReview(
-  { postId, title, body: postBody, subredditName }: PendingForm,
+  { postId, title, body: postBody }: PendingForm,
   pdfUrl: string | null,
 ): Promise<UiResponse> {
   const supabaseUrl = (await settings.get<string>('supabaseUrl')) || '';
   const supabaseKey = (await settings.get<string>('supabaseServiceRoleKey')) || '';
-  const dedupeKey   = `bot:adversarial:lock:${postId}`;
-
-  if (supabaseUrl && supabaseKey) {
-    try {
-      const jobRes = await fetchWithLogging(`${supabaseUrl}/rest/v1/review_jobs`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'apikey': supabaseKey,
-          'Authorization': `Bearer ${supabaseKey}`,
-          'Prefer': 'return=minimal',
-        },
-        body: JSON.stringify({ post_id: postId, pdf_url: pdfUrl, title, body: postBody }),
-      });
-      if (jobRes.ok || jobRes.status === 409) {
-        await redis.zAdd(PENDING_JOBS_KEY, { score: Date.now(), member: postId as string });
-        log.info('review_queued_via_form', { postId, pdfUrl: pdfUrl ?? '(none)' });
-        return { showToast: { text: 'Review request queued. Please wait.', appearance: 'neutral' } };
-      }
-      log.warn('supabase_submit_failed', { postId, status: jobRes.status });
-    } catch (err) {
-      log.warn('supabase_submit_threw', { postId, error: (err as Error).message });
-    }
-  }
-
-  // Inline text-only fallback
-  const apiKey = (await settings.get<string>('geminiApiKey')) || '';
-  if (!apiKey) return { showToast: { text: 'Gemini API key not configured.', appearance: 'neutral' } };
 
   try {
-    const result = await callGemini(title, postBody, apiKey);
-    if (!result) {
-      await redis.del(dedupeKey);
-      await redis.zRem(ACTIVE_LOCKS_KEY, [postId as string]);
-      return { showToast: { text: 'Gemini returned an empty review.', appearance: 'neutral' } };
+    const jobRes = await fetchWithLogging(`${supabaseUrl}/rest/v1/review_jobs`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': supabaseKey,
+        'Authorization': `Bearer ${supabaseKey}`,
+        'Prefer': 'return=minimal',
+      },
+      body: JSON.stringify({ post_id: postId, pdf_url: pdfUrl, title, body: postBody }),
+    });
+    if (jobRes.ok || jobRes.status === 409) {
+      await redis.zAdd(PENDING_JOBS_KEY, { score: Date.now(), member: postId as string });
+      log.info('review_queued_via_form', { postId, pdfUrl: pdfUrl ?? '(none)' });
+      return { showToast: { text: 'Review request queued. Please wait.', appearance: 'neutral' } };
     }
-    const rawSignature = (await settings.get<string>('botSignature')) ?? '';
-    const signature    = formatSignature(rawSignature);
-    const fullPost     = await reddit.getPostById(postId);
-    const comment      = await fullPost.addComment({ text: result.text + signature });
-    await comment.distinguish(true);
-    log.info('text_review_posted_via_form', { postId });
-    if (subredditName.toLowerCase() === DEV_SUB) {
-      await redis.del(dedupeKey);
-      await redis.zRem(ACTIVE_LOCKS_KEY, [postId as string]);
-      log.info('dedup_lock_released', { postId });
-    }
-    return { showToast: { text: 'Review posted!', appearance: 'success' } };
+    log.warn('supabase_submit_failed', { postId, status: jobRes.status });
   } catch (err) {
-    log.error('form_fallback_failed', err as Error, { postId });
-    await redis.del(dedupeKey);
-    await redis.zRem(ACTIVE_LOCKS_KEY, [postId as string]);
-    return { showToast: { text: 'Review failed — try again later.', appearance: 'neutral' } };
+    log.warn('supabase_submit_threw', { postId, error: (err as Error).message });
   }
+
+  // Supabase unavailable — add to retry queue; scheduler will re-attempt in 15 min
+  const retryMember = JSON.stringify({ postId, title, body: postBody, pdfUrl, attempts: 1 });
+  await redis.zAdd(RETRY_QUEUE_KEY, { score: Date.now() + RETRY_DELAY_MS, member: retryMember });
+  log.warn('supabase_unavailable_queued_retry', { postId, pdfUrl: pdfUrl ?? '(none)' });
+  return { showToast: { text: 'Could not queue right now — will retry automatically.', appearance: 'neutral' } };
 }
 
 // ─── Route handlers ───────────────────────────────────────────────────────────
@@ -216,13 +128,6 @@ export function register(app: Hono): void {
       return c.json<UiResponse>({ showToast: { text: 'This post has already been reviewed.', appearance: 'neutral' } });
     }
     await redis.zAdd(ACTIVE_LOCKS_KEY, { score: Date.now() + DEDUPE_TTL_SECS * 1000, member: postId as string });
-
-    const apiKey = (await settings.get<string>('geminiApiKey')) || undefined;
-    if (!apiKey) {
-      await redis.del(dedupeKey);
-      await redis.zRem(ACTIVE_LOCKS_KEY, [postId as string]);
-      return c.json<UiResponse>({ showToast: { text: 'Gemini API key not configured.', appearance: 'neutral' } });
-    }
 
     let fullPost: Awaited<ReturnType<typeof reddit.getPostById>>;
     try {
@@ -266,14 +171,11 @@ export function register(app: Hono): void {
       }
     }
 
-    // Gate: per-user daily quota (mods exempt); also capture OP status for form prompt below
-    let isOp = false;
+    // Gate: per-user daily quota (mods exempt)
     let currentUser: Awaited<ReturnType<typeof reddit.getCurrentUser>> | null = null;
     try {
       currentUser = await reddit.getCurrentUser();
       if (currentUser) {
-        isOp = !!(fullPost.authorId && currentUser.id === fullPost.authorId);
-
         let isModerator = false;
         try {
           const mods = await reddit.getModerators({ subredditName, username: currentUser.username }).all();
@@ -371,78 +273,8 @@ export function register(app: Hono): void {
 
     log.info('review_requested', { postId, candidates: candidateUrls.length });
 
-    // ── PDF path: offload to Supabase Edge Function (no 30s timeout) ──────────
-    const supabaseUrl = (await settings.get<string>('supabaseUrl')) || '';
-    const supabaseKey = (await settings.get<string>('supabaseServiceRoleKey')) || '';
-
-    if (supabaseUrl && supabaseKey && candidateUrls.length > 0) {
-      try {
-        const jobRes = await fetchWithLogging(`${supabaseUrl}/rest/v1/review_jobs`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'apikey': supabaseKey,
-            'Authorization': `Bearer ${supabaseKey}`,
-            'Prefer': 'return=minimal',
-          },
-          body: JSON.stringify({
-            post_id: postId,
-            pdf_url: candidateUrls[0],
-            title: fullPost.title,
-            body: postBody.slice(0, 8000),
-          }),
-        });
-
-        if (jobRes.ok || jobRes.status === 409) {
-          // 409 = UNIQUE conflict — already queued for this post, that's fine
-          await redis.zAdd(PENDING_JOBS_KEY, { score: Date.now(), member: postId as string });
-          log.info('PDF review job queued to Supabase', { postId, pdfUrl: candidateUrls[0] });
-          return c.json<UiResponse>({ showToast: { text: 'Review request queued. Please wait.', appearance: 'neutral' } });
-        }
-        log.warn('Supabase job insert failed — falling back to text-only', { postId, status: jobRes.status });
-      } catch (err) {
-        log.warn('Supabase submit threw — falling back to text-only', { postId, error: (err as Error).message });
-      }
-    }
-
-    // ── Text-only fallback ────────────────────────────────────────────────────
-    let result: { text: string; model: string } | null = null;
-    try {
-      result = await callGemini(fullPost.title, postBody, apiKey);
-    } catch (err) {
-      log.error('Gemini review failed', err as Error, { postId });
-      await redis.del(dedupeKey);
-      await redis.zRem(ACTIVE_LOCKS_KEY, [postId as string]);
-      return c.json<UiResponse>({ showToast: { text: 'Review failed — try again later.', appearance: 'neutral' } });
-    }
-
-    if (!result) {
-      await redis.del(dedupeKey);
-      await redis.zRem(ACTIVE_LOCKS_KEY, [postId as string]);
-      return c.json<UiResponse>({ showToast: { text: 'Gemini returned an empty review.', appearance: 'neutral' } });
-    }
-
-    const rawSignature = (await settings.get<string>('botSignature')) ?? '';
-    const signature    = formatSignature(rawSignature);
-    try {
-      const comment = await fullPost.addComment({ text: result.text + signature });
-      await comment.distinguish(true);
-      log.info('Adversarial review posted', { postId, commentId: comment.id });
-
-      // On the dev sub, release the dedup lock so the post can be re-reviewed
-      if (subredditName.toLowerCase() === DEV_SUB) {
-        await redis.del(dedupeKey);
-        await redis.zRem(ACTIVE_LOCKS_KEY, [postId as string]);
-        log.info('Dev sub — dedup lock released', { postId });
-      }
-    } catch (err) {
-      log.error('Failed to post review comment', err as Error, { postId });
-      await redis.del(dedupeKey);
-      await redis.zRem(ACTIVE_LOCKS_KEY, [postId as string]);
-      return c.json<UiResponse>({ showToast: { text: 'Review generated but failed to post.', appearance: 'neutral' } });
-    }
-
-    return c.json<UiResponse>({ showToast: { text: 'Review posted!', appearance: 'success' } });
+    const pdfUrl = candidateUrls.length > 0 ? candidateUrls[0] : null;
+    return c.json<UiResponse>(await queueOrReview({ postId, title: fullPost.title, body: postBody, subredditName }, pdfUrl));
   });
 
   // ── Scheduler: poll Supabase for completed PDF review jobs ──────────────────
@@ -451,18 +283,21 @@ export function register(app: Hono): void {
     const supabaseKey = (await settings.get<string>('supabaseServiceRoleKey')) || '';
     if (!supabaseUrl || !supabaseKey) return c.json({ status: 'no supabase config' });
 
-    const rawSignature = (await settings.get<string>('botSignature')) ?? '';
-    const signature    = formatSignature(rawSignature);
-    const cutoff       = Date.now() - PDF_JOB_TTL_SECS * 1000;
+    const [rawSignature, lockComment, stickyComment] = await Promise.all([
+      settings.get<string>('botSignature').then(v => v ?? ''),
+      settings.get<boolean>('adversarialReviewerLockComment').then(v => v ?? false),
+      settings.get<boolean>('adversarialReviewerStickyComment').then(v => v ?? false),
+    ]);
+    const signature = formatSignature(rawSignature);
+    const cutoff    = Date.now() - PDF_JOB_TTL_SECS * 1000;
 
     // Get all pending postIds from the sorted set (score = enqueue timestamp).
     // zRange returns { member: string } objects in this Devvit version — extract member.
     const pendingRaw = await redis.zRange(PENDING_JOBS_KEY, 0, -1);
     type ZEntry = string | { member: string };
     const pendingIds = pendingRaw.map((e: ZEntry) => (typeof e === 'string' ? e : e.member));
-    if (!pendingIds.length) return c.json({ status: 'nothing pending' });
 
-    log.info('PDF poll tick', { count: pendingIds.length });
+    log.info('pdf_poll_tick', { pending: pendingIds.length });
 
     for (const postId of pendingIds) {
       // Stale check — give up on jobs older than PDF_JOB_TTL_SECS
@@ -497,7 +332,8 @@ export function register(app: Hono): void {
             type FullPostDetails = { subredditName?: string };
             const subredditName = ((fullPost as typeof fullPost & FullPostDetails).subredditName) ?? '';
             const comment       = await fullPost.addComment({ text: job.result + signature });
-            await comment.distinguish(true);
+            await comment.distinguish(stickyComment);
+            if (lockComment) { try { await comment.lock(); } catch (err) { log.warn('comment_lock_failed', { postId, error: (err as Error).message }); } }
             log.info('PDF review posted', { postId, commentId: comment.id });
             // On the dev sub, release dedup lock so the post can be re-reviewed
             if (subredditName.toLowerCase() === DEV_SUB) {
@@ -524,7 +360,59 @@ export function register(app: Hono): void {
       }
     }
 
-    return c.json({ status: 'ok', checked: pendingIds.length });
+    // ── Drain retry queue ─────────────────────────────────────────────────────
+    const retryNow = Date.now();
+    const retryRaw = await redis.zRange(RETRY_QUEUE_KEY, 0, retryNow, { by: 'score' });
+    const retryMembers = (retryRaw as ZEntry[]).map((e: ZEntry) => (typeof e === 'string' ? e : e.member));
+
+    for (const member of retryMembers) {
+      let job: { postId: string; title: string; body: string; pdfUrl: string | null; attempts: number };
+      try {
+        job = JSON.parse(member);
+      } catch {
+        await redis.zRem(RETRY_QUEUE_KEY, [member]);
+        continue;
+      }
+
+      const { postId: rPostId, title: rTitle, body: rBody, pdfUrl: rPdfUrl, attempts } = job;
+
+      if (attempts >= MAX_RETRY_ATTEMPTS) {
+        log.warn('retry_max_attempts_reached', { postId: rPostId, attempts });
+        await redis.zRem(RETRY_QUEUE_KEY, [member]);
+        await redis.del(`bot:adversarial:lock:${rPostId}`);
+        await redis.zRem(ACTIVE_LOCKS_KEY, [rPostId]);
+        continue;
+      }
+
+      try {
+        const jobRes = await fetchWithLogging(`${supabaseUrl}/rest/v1/review_jobs`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': supabaseKey,
+            'Authorization': `Bearer ${supabaseKey}`,
+            'Prefer': 'return=minimal',
+          },
+          body: JSON.stringify({ post_id: rPostId, pdf_url: rPdfUrl, title: rTitle, body: rBody }),
+        });
+        await redis.zRem(RETRY_QUEUE_KEY, [member]);
+        if (jobRes.ok || jobRes.status === 409) {
+          await redis.zAdd(PENDING_JOBS_KEY, { score: Date.now(), member: rPostId });
+          log.info('retry_resubmitted', { postId: rPostId, attempts });
+        } else {
+          const updated = JSON.stringify({ ...job, attempts: attempts + 1 });
+          await redis.zAdd(RETRY_QUEUE_KEY, { score: Date.now() + RETRY_DELAY_MS, member: updated });
+          log.warn('retry_still_failing', { postId: rPostId, nextAttempts: attempts + 1, status: jobRes.status });
+        }
+      } catch (err) {
+        await redis.zRem(RETRY_QUEUE_KEY, [member]);
+        const updated = JSON.stringify({ ...job, attempts: attempts + 1 });
+        await redis.zAdd(RETRY_QUEUE_KEY, { score: Date.now() + RETRY_DELAY_MS, member: updated });
+        log.warn('retry_threw', { postId: rPostId, nextAttempts: attempts + 1, error: (err as Error).message });
+      }
+    }
+
+    return c.json({ status: 'ok', checked: pendingIds.length, retried: retryMembers.length });
   });
 
   // ── Menu: LLM Reviewer Settings (mod-only, subreddit) ──────────────────────
