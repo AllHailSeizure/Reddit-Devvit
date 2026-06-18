@@ -77,7 +77,7 @@ npx devvit publish --bump <minor|patch|major>
 - If using `--bump`: must use the same flag as the upload step
 - **Double-bump warning (--bump only):** `npx devvit upload --bump minor` bumps once (e.g. 2.12.0 → 2.13.0), then `npx devvit publish --bump minor` bumps again (2.13.0 → 2.14.0). Two bumps per release cycle.
 - The version shown in `npx devvit publish` output is authoritative — use that for tagging and docs
-- After publish: `git tag v<version>` → merge `publish → master` → `git push origin master --tags`
+- After publish: `git tag bot/v<version>` → merge `publish-bot → master` → `git push origin master --tags`
 
 ---
 

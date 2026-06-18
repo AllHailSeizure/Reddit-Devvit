@@ -58,12 +58,13 @@ The one-line rule: **if the small read commands work, stop touching auth — it'
 
 | Branch | Location | Purpose |
 |---|---|---|
-| `develop` | Local only | Sandbox — never pushed |
-| `publish` | Local + remote | Finished, verified modules only — one at a time |
-| `master` | Local + remote | Integration point; merged from publish |
+| `develop` | Local only | Sandbox — both apps |
+| `publish-bot` | Local + remote | Verified bot modules only |
+| `publish-bingo` | Local + remote | Verified bingo releases only |
+| `master` | Local + remote | Integration point; both apps |
 | `origin/master` | Remote | Deployed state |
 
-Work on `develop`. Cherry-pick verified modules to `publish`. Merge `publish` → `master` → `origin/master` to deploy.
+Work on `develop`. Stage verified files onto `publish-bot` or `publish-bingo`. Merge to `master` → `origin/master` to deploy.
 
 ## Git tag convention
 

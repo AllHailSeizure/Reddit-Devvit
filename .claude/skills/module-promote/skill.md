@@ -1,6 +1,6 @@
 ---
 name: module-promote
-description: Use when promoting a verified llmphysics-bot module from the develop branch to publish. Handles file-path staging, lint gate, README/CHANGELOG updates, upload smoke test, publish, and git tagging.
+description: Use when promoting a verified llmphysics-bot module from the develop branch to publish-bot. Handles file-path staging, lint gate, README/CHANGELOG updates, upload smoke test, publish, and git tagging.
 ---
 
 # module-promote
@@ -28,7 +28,7 @@ npm run build  # must compile clean
 
 **3. Stage by file path**
 ```bash
-git checkout publish
+git checkout publish-bot
 git checkout develop -- src/server/trigger-modules/<name>.ts   # adjust path for module type
 git checkout develop -- src/server/registry.ts                 # always
 git checkout develop -- llmphysics-bot/.documentation/verification-status.md  # always
@@ -77,7 +77,7 @@ Confirm the new version number in the CLI output.
 Update the `## <module-name>` section in `llmphysics-bot/.documentation/verification-status.md`:
 - Set `Last promoted` to today's date + the version number from step 9's output
 
-Then commit on the `publish` branch:
+Then commit on the `publish-bot` branch:
 ```bash
 git add llmphysics-bot/.documentation/verification-status.md
 git commit -m "chore(<name>): record promote — vX.X.X"
@@ -85,9 +85,9 @@ git commit -m "chore(<name>): record promote — vX.X.X"
 
 **10. Tag and merge**
 ```bash
-git tag v<new-version>   # e.g. git tag v2.4.0
+git tag bot/v<new-version>   # e.g. git tag v2.4.0
 git checkout master
-git merge publish
+git merge publish-bot
 git push origin master
 git push origin --tags
 ```

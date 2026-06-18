@@ -1,6 +1,6 @@
 ---
 name: module-verify
-description: Use when verifying a llmphysics-bot module is production-ready before promoting to the publish branch. Covers trigger, action, and scheduler module types with automated Reddit API testing and devvit logs.
+description: Use when verifying a llmphysics-bot module is production-ready before promoting to the publish-bot branch. Covers trigger, action, and scheduler module types with automated Reddit API testing and devvit logs.
 ---
 
 # module-verify
