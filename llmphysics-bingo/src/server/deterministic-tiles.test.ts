@@ -6,7 +6,7 @@ import {
   commentPurge,
   commentExplosion,
   depthCapSpiral,
-  evaluateDeterministic,
+  evaluate,
   flattenComments,
   countModRemovals,
   countDepthCapReports,
@@ -240,7 +240,7 @@ describe('dominantEmDashContributor', () => {
   });
 });
 
-describe('evaluateDeterministic', () => {
+describe('evaluate', () => {
   const TILES = [
     { valueKey: 'em-dash-epidemic', validate: emDashEpidemic },
     { valueKey: 'two-person-war', validate: twoPersonWar },
@@ -254,34 +254,33 @@ describe('evaluateDeterministic', () => {
 
   it('returns triggered tiles with triggeredBy null (structural, no single author)', () => {
     const t = thread({ modRemovals: 7 });
-    expect(evaluateDeterministic(TILES, [t])).toEqual([{ valueKey: 'comment-purge', triggeredBy: null }]);
+    expect(evaluate(TILES, [t])).toEqual([{ valueKey: 'comment-purge', triggeredBy: null }]);
   });
   it('dedupes a tile that fires across multiple posts', () => {
     const a = thread({ postId: 't3_a', modRemovals: 7 });
     const b = thread({ postId: 't3_b', modRemovals: 9 });
-    expect(evaluateDeterministic(TILES, [a, b])).toEqual([{ valueKey: 'comment-purge', triggeredBy: null }]);
+    expect(evaluate(TILES, [a, b])).toEqual([{ valueKey: 'comment-purge', triggeredBy: null }]);
   });
   it('reports multiple distinct tiles from one thread', () => {
     const t = thread({ body: '—'.repeat(40), modRemovals: 7 });
-    const keys = evaluateDeterministic(TILES, [t]).map((r) => r.valueKey).sort();
+    const keys = evaluate(TILES, [t]).map((r) => r.valueKey).sort();
     expect(keys).toEqual(['comment-purge', 'em-dash-epidemic']);
   });
-  it('ignores tiles without a validate fn (semantic tiles)', () => {
-    const t = thread({ modRemovals: 7 });
-    const semanticOnly = [{ valueKey: 'coherence-drop' }];
-    expect(evaluateDeterministic(semanticOnly, [t])).toEqual([]);
+  it('returns [] when no tile threshold is met', () => {
+    const t = thread({ modRemovals: 0 });
+    expect(evaluate(TILES, [t])).toEqual([]);
   });
   it('returns [] when nothing meets a threshold', () => {
-    expect(evaluateDeterministic(TILES, [thread()])).toEqual([]);
+    expect(evaluate(TILES, [thread()])).toEqual([]);
   });
   it('uses attribute fn to populate triggeredBy on em-dash tile', () => {
     const t = thread({ opAuthor: 'spammer', body: '—'.repeat(40) });
-    const result = evaluateDeterministic(TILES_WITH_ATTR, [t]);
+    const result = evaluate(TILES_WITH_ATTR, [t]);
     expect(result).toEqual([{ valueKey: 'em-dash-epidemic', triggeredBy: 'spammer' }]);
   });
   it('tiles without attribute still return triggeredBy null', () => {
     const t = thread({ modRemovals: 7 });
-    const result = evaluateDeterministic(TILES_WITH_ATTR, [t]);
+    const result = evaluate(TILES_WITH_ATTR, [t]);
     expect(result).toEqual([{ valueKey: 'comment-purge', triggeredBy: null }]);
   });
 });

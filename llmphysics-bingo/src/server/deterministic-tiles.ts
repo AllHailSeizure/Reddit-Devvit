@@ -1,15 +1,9 @@
-// Deterministic tile evaluators.
-//
-// Three bingo tiles are pure *counts*, not semantic judgments — and LLMs count
-// unreliably (the em-dash tile fired at ~15 when its threshold is 40). These are
-// decided in code instead. Everything fuzzy/contextual stays with Gemini; only the
-// arithmetic lives here. Pure and side-effect-free so they unit-test directly.
-//
-// Parked sibling (see llmphysics-bot/ideas.md): a scope→prefilter→adjudicate pipeline
-// for semantic tiles, to be adopted per-tile only if one proves flaky in live use.
+// Deterministic tile evaluators — all bingo tiles evaluated in code, no Gemini.
+// Pure and side-effect-free so they unit-test directly.
 
-import type { TriggeredTile } from './validation-core';
 import type { BingoEvent } from './tiles';
+
+export type TriggeredTile = { valueKey: string; triggeredBy: string | null };
 
 /** A nested comment node (structurally the validator's ThreadNode). */
 export type CommentNode = { author: string; body: string; replies: CommentNode[] };
@@ -136,10 +130,9 @@ export function buildCountedThreadsFromEvents(events: BingoEvent[]): CountedThre
   });
 }
 
-/** A tile carrying a deterministic `validate` (the count-based tiles). */
 export type DeterministicTile = {
   valueKey: string;
-  validate?: (t: CountedThread) => boolean;
+  validate: (t: CountedThread) => boolean;
   /** Optional: when validate fires, return the username most responsible. null = community trigger. */
   attribute?: (t: CountedThread) => string | null;
 };
@@ -266,17 +259,92 @@ export function thatsAGreatQuestion(t: CountedThread): boolean {
   });
 }
 
-/**
- * Evaluate the deterministic (count-based) tiles across the given threads. A tile fires
- * once if any thread meets its threshold. triggeredBy comes from the tile's `attribute` fn
- * if present; otherwise null (community trigger, never self-triggers). Tiles without a
- * `validate` are ignored here (they're semantic — handled by Gemini).
- */
-export function evaluateDeterministic(tiles: DeterministicTile[], threads: CountedThread[]): TriggeredTile[] {
+// ─── Remaining tiles ─────────────────────────────────────────────────────────
+
+export function xkcd3155(t: CountedThread): boolean {
+  return anyComment(t, (b) => b.includes('3155'));
+}
+
+export function unrenderedLatex(t: CountedThread): boolean {
+  const stripped = t.body.replace(/```[\s\S]*?```/g, '').replace(/`[^`]*`/g, '');
+  return /\\[a-zA-Z{(]/.test(stripped);
+}
+
+export function quarantineDiscourse(t: CountedThread): boolean {
+  return anyComment(t, (b) =>
+    b.includes('quarantine') ||
+    b.includes('containment') ||
+    (b.includes('keep') && b.includes('llm') && (b.includes('off') || b.includes('out'))) ||
+    (b.includes('banned') && (b.includes('r/physics') || b.includes('other subs')))
+  );
+}
+
+export function llmsCantDoMath(t: CountedThread): boolean {
+  return anyComment(t, (b) =>
+    (b.includes("can't do math") || b.includes('cannot do math') || b.includes("can't do mathematics")) &&
+    (b.includes('llm') || b.includes('chatgpt') || b.includes('gpt'))
+  );
+}
+
+export function explainWithoutLlm(t: CountedThread): boolean {
+  return anyComment(t, (b) =>
+    (b.includes('without') && (b.includes('llm') || b.includes('chatgpt') || b.includes('an ai') || b.includes('using ai'))) ||
+    b.includes('own words')
+  );
+}
+
+export function opCantDoMath(t: CountedThread): boolean {
+  return t.comments.some((c) => {
+    const b = c.body.toLowerCase();
+    return (
+      c.author === t.opAuthor &&
+      (((b.includes("can't do") || b.includes('cannot do') || b.includes("don't understand") || b.includes('not great with')) &&
+        b.includes('math')) ||
+        b.includes("can't formalize") ||
+        b.includes('someone who knows the math'))
+    );
+  });
+}
+
+export function isOpQualified(t: CountedThread): boolean {
+  return t.comments.some((c) => {
+    const b = c.body.toLowerCase();
+    return (
+      c.author !== t.opAuthor &&
+      ((b.includes('physics') &&
+        (b.includes('background') || b.includes('degree') || b.includes('education') ||
+          b.includes('credentials') || b.includes('studied'))) ||
+        b.includes('are you a physicist') ||
+        b.includes('your physics'))
+    );
+  });
+}
+
+export function didYouReadYourPost(t: CountedThread): boolean {
+  return t.comments.some(
+    (c) =>
+      c.author !== t.opAuthor &&
+      (c.body.includes('did you read') || c.body.includes('have you read') ||
+        c.body.includes('did you even read') || c.body.includes('did you actually read') ||
+        c.body.includes('did you look at this'))
+  );
+}
+
+export function didYouReadMyPost(t: CountedThread): boolean {
+  return t.comments.some(
+    (c) =>
+      c.author === t.opAuthor &&
+      (c.body.includes('did you read') || c.body.includes('have you read') ||
+        c.body.includes('did you even read') || c.body.includes('did you actually read'))
+  );
+}
+
+/** Evaluate all tiles across the given threads. A tile fires once if any thread meets its condition. */
+export function evaluate(tiles: DeterministicTile[], threads: CountedThread[]): TriggeredTile[] {
   const fired = new Map<string, CountedThread>();
   for (const t of threads) {
     for (const tile of tiles) {
-      if (tile.validate && !fired.has(tile.valueKey) && tile.validate(t)) fired.set(tile.valueKey, t);
+      if (!fired.has(tile.valueKey) && tile.validate(t)) fired.set(tile.valueKey, t);
     }
   }
   return [...fired.entries()].map(([valueKey, thread]) => {

@@ -33,7 +33,7 @@ vi.mock('@devvit/web/server', () => ({
 }));
 
 vi.mock('./validator', () => ({
-  evaluateTestEvents: vi.fn(async () => []),
+  evaluateEvents: vi.fn(() => []),
 }));
 
 // ─── Imports (after mocks) ────────────────────────────────────────────────────
@@ -47,7 +47,7 @@ import {
   type SimulationData,
 } from './simulation';
 import { reddit } from '@devvit/web/server';
-import { evaluateTestEvents as mockEval } from './validator';
+import { evaluateEvents as mockEval } from './validator';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -136,13 +136,13 @@ describe('fetchDaySlice', () => {
   beforeEach(() => {
     store.clear();
     vi.clearAllMocks();
-    vi.mocked(mockEval).mockResolvedValue([]);
+    vi.mocked(mockEval).mockReturnValue([]);
   });
 
   it('returns zero counts when no posts fall in the window', async () => {
     const oldPost = mockPost(DAY_START - 1); // 1ms before window
     vi.mocked(reddit.getNewPosts).mockReturnValue(makeListing([oldPost]) as any);
-    const result = await fetchDaySlice('llmphysics', DAY_START, DAY_END, 'key', []);
+    const result = await fetchDaySlice('llmphysics', DAY_START, DAY_END, []);
     expect(result.postsScanned).toBe(0);
     expect(result.commentsScanned).toBe(0);
     expect(result.triggeredKeys).toEqual([]);
@@ -154,7 +154,7 @@ describe('fetchDaySlice', () => {
     ];
     const post = mockPost(DAY_START + 1000, comments);
     vi.mocked(reddit.getNewPosts).mockReturnValue(makeListing([post]) as any);
-    const result = await fetchDaySlice('llmphysics', DAY_START, DAY_END, 'key', []);
+    const result = await fetchDaySlice('llmphysics', DAY_START, DAY_END, []);
     expect(result.postsScanned).toBe(1);
     expect(result.commentsScanned).toBe(1);
   });
@@ -162,8 +162,8 @@ describe('fetchDaySlice', () => {
   it('merges new triggered keys with previous cumulative set', async () => {
     const post = mockPost(DAY_START + 1000);
     vi.mocked(reddit.getNewPosts).mockReturnValue(makeListing([post]) as any);
-    vi.mocked(mockEval).mockResolvedValue([{ valueKey: 'resonance-drop', triggeredBy: null }]);
-    const result = await fetchDaySlice('llmphysics', DAY_START, DAY_END, 'key', ['consciousness-drop']);
+    vi.mocked(mockEval).mockReturnValue([{ valueKey: 'resonance-drop', triggeredBy: null }]);
+    const result = await fetchDaySlice('llmphysics', DAY_START, DAY_END, ['consciousness-drop']);
     expect(result.triggeredKeys).toContain('resonance-drop');
     expect(result.triggeredKeys).toContain('consciousness-drop');
     // dayKeys is non-cumulative: only what Gemini returned THIS day
@@ -174,15 +174,15 @@ describe('fetchDaySlice', () => {
   it('deduplicates keys present in both prev and new', async () => {
     const post = mockPost(DAY_START + 1000);
     vi.mocked(reddit.getNewPosts).mockReturnValue(makeListing([post]) as any);
-    vi.mocked(mockEval).mockResolvedValue([{ valueKey: 'consciousness-drop', triggeredBy: null }]);
-    const result = await fetchDaySlice('llmphysics', DAY_START, DAY_END, 'key', ['consciousness-drop']);
+    vi.mocked(mockEval).mockReturnValue([{ valueKey: 'consciousness-drop', triggeredBy: null }]);
+    const result = await fetchDaySlice('llmphysics', DAY_START, DAY_END, ['consciousness-drop']);
     const dupeCount = result.triggeredKeys.filter((k) => k === 'consciousness-drop').length;
     expect(dupeCount).toBe(1);
   });
 
   it('skips Gemini call when no events were found', async () => {
     vi.mocked(reddit.getNewPosts).mockReturnValue(makeListing([]) as any);
-    await fetchDaySlice('llmphysics', DAY_START, DAY_END, 'key', []);
+    await fetchDaySlice('llmphysics', DAY_START, DAY_END, []);
     expect(mockEval).not.toHaveBeenCalled();
   });
 });

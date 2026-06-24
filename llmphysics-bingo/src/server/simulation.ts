@@ -1,7 +1,7 @@
 import { redis } from '@devvit/redis';
 import { reddit } from '@devvit/web/server';
 import type { BingoEvent } from './tiles';
-import { evaluateTestEvents } from './validator';
+import { evaluateEvents } from './validator';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -71,7 +71,6 @@ export async function fetchDaySlice(
   subredditName: string,
   dayStartTs: number,
   dayEndTs: number,
-  geminiApiKey: string,
   prevTriggeredKeys: string[]
 ): Promise<SimDay> {
   const events: BingoEvent[] = [];
@@ -112,8 +111,7 @@ export async function fetchDaySlice(
     }
   }
 
-  // Skip Gemini if nothing was found (avoids an empty API call)
-  const triggered = events.length > 0 ? await evaluateTestEvents(geminiApiKey, events) : [];
+  const triggered = events.length > 0 ? evaluateEvents(events) : [];
   const newKeys = triggered.map((t) => t.valueKey);
   const triggeredKeys = [...new Set([...prevTriggeredKeys, ...newKeys])];
 
