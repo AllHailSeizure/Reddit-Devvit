@@ -1,6 +1,7 @@
-import { context, reddit, settings } from '@devvit/web/server';
+import { context, reddit } from '@devvit/web/server';
 import { redis } from '@devvit/redis';
-import { TILE_VALIDATORS, type BingoEvent } from './tiles';
+import type { BingoEvent } from './types';
+import { getBingoConfig } from './config';
 import { runPacing, type TileTrigger } from './pacing';
 import { appendBingoEvent, runBatchValidation, evaluateEvents } from './validator';
 import { readSetting, writeSetting } from './settings';
@@ -34,13 +35,16 @@ type Square = {
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const TILE_POOL: TileDefinition[] = TILE_VALIDATORS.map(({ label, displayName, gameDescription, valueKey }) => ({
-  label,
-  displayName: displayName ?? '',
-  gameDescription: gameDescription ?? '',
-  valueKey,
-}));
 const GAME_TTL_SECS = 60 * 60 * 24 * 8;
+
+function getTilePool(): TileDefinition[] {
+  return getBingoConfig().tiles.map(({ label, displayName, gameDescription, valueKey }) => ({
+    label,
+    displayName: displayName ?? '',
+    gameDescription: gameDescription ?? '',
+    valueKey,
+  }));
+}
 
 // ─── Card generation ──────────────────────────────────────────────────────────
 
@@ -54,6 +58,7 @@ function shuffle<T>(arr: T[]): T[] {
 }
 
 function generateCard(): Square[] {
+  const TILE_POOL = getTilePool();
   let picked = shuffle(TILE_POOL);
   while (picked.length < 24) {
     picked = picked.concat(shuffle(TILE_POOL));
@@ -436,8 +441,9 @@ export async function getBingoStats(c: { req: { query: (k: string) => string | u
   const gameId = gameRaw ? (JSON.parse(gameRaw) as { gameId: string }).gameId : postId;
   const startTs = gameRaw ? (JSON.parse(gameRaw) as { startedAt: number }).startedAt : 0;
 
+  const { tiles } = getBingoConfig();
   const triggers: TileTrigger[] = await Promise.all(
-    TILE_VALIDATORS.map(async (t) => {
+    tiles.map(async (t) => {
       const at = await redis.get(`bot:bingo:game:${gameId}:triggered-at:${t.valueKey}`);
       const by = await redis.get(`bot:bingo:game:${gameId}:triggered-by:${t.valueKey}`);
       return {
@@ -449,19 +455,19 @@ export async function getBingoStats(c: { req: { query: (k: string) => string | u
     })
   );
 
-  const pool = TILE_VALIDATORS.map((t) => t.valueKey);
+  const pool = tiles.map((t) => t.valueKey);
   const pacing = runPacing(pool, triggers, { cards: 5000, startTs });
 
-  const tiles = triggers
+  const tilesSorted = triggers
     .map((t) => ({
       valueKey: t.valueKey,
-      label: TILE_VALIDATORS.find((v) => v.valueKey === t.valueKey)?.displayName ?? t.valueKey,
+      label: tiles.find((v) => v.valueKey === t.valueKey)?.displayName ?? t.valueKey,
       firstTriggerAt: t.firstTriggerAt == null ? null : t.firstTriggerAt - startTs,
       triggeredBy: t.triggeredBy,
     }))
     .sort((a, b) => (a.firstTriggerAt ?? Infinity) - (b.firstTriggerAt ?? Infinity));
 
-  return c.json({ pacing, tiles });
+  return c.json({ pacing, tiles: tilesSorted });
 }
 
 export async function createBingoPost(c: { json: (v: unknown, s?: number) => Response }): Promise<Response> {
@@ -477,7 +483,7 @@ export async function createBingoPost(c: { json: (v: unknown, s?: number) => Res
       return c.json({ showToast: { text: 'Only moderators can create a bingo post.', appearance: 'neutral' } });
     }
     const post = await reddit.submitCustomPost({
-      title: 'LLMPhysics Bingo!',
+      title: getBingoConfig().postTitle,
       entry: 'default',
     });
     const gameId = post.id;
@@ -596,10 +602,11 @@ export async function runTestValidation(c: { json: (v: unknown, s?: number) => R
   if (events.length === 0) return c.json({ ok: true, triggered: [], batchSize: 0, message: 'Test batch is empty.' });
 
   try {
+    const { tiles } = getBingoConfig();
     const triggered = evaluateEvents(events);
     const result = triggered.map((t) => ({
       valueKey: t.valueKey,
-      label: TILE_VALIDATORS.find((v) => v.valueKey === t.valueKey)?.displayName ?? t.valueKey,
+      label: tiles.find((v) => v.valueKey === t.valueKey)?.displayName ?? t.valueKey,
       triggeredBy: t.triggeredBy,
     }));
     return c.json({ ok: true, triggered: result, batchSize: events.length });
@@ -649,7 +656,8 @@ export async function runSimulationFetchDay(
   if (!subredditName) return c.json({ ok: false, reason: 'No subreddit context.' });
 
   let data: SimulationData | null = await getSimulationData();
-  const pool = TILE_VALIDATORS.map((t) => t.valueKey);
+  const { tiles } = getBingoConfig();
+  const pool = tiles.map((t) => t.valueKey);
 
   if (!data || reset) {
     data = { generatedAt: Date.now(), subredditName, pool, days: [] };

@@ -1,6 +1,6 @@
 import { redis } from '@devvit/redis';
-import { TILE_VALIDATORS, type BingoEvent } from './tiles';
-import { evaluate, buildCountedThreadsFromEvents, type TriggeredTile } from './deterministic-tiles';
+import type { BingoEvent, TriggeredTile } from './types';
+import { getBingoConfig } from './config';
 
 const TRIGGER_TTL = 60 * 60 * 24 * 8;
 
@@ -21,7 +21,8 @@ export async function appendBingoEvent(gameId: string, event: BingoEvent): Promi
 
 export function evaluateEvents(events: BingoEvent[]): TriggeredTile[] {
   if (events.length === 0) return [];
-  return evaluate(TILE_VALIDATORS, buildCountedThreadsFromEvents(events));
+  const { tiles, buildCountedThreads, evaluate } = getBingoConfig();
+  return evaluate(tiles, buildCountedThreads(events));
 }
 
 export async function runBatchValidation(gameId: string): Promise<void> {
@@ -34,14 +35,15 @@ export async function runBatchValidation(gameId: string): Promise<void> {
     return;
   }
 
-  const triggered = evaluate(TILE_VALIDATORS, buildCountedThreadsFromEvents(events));
+  const { tiles, buildCountedThreads, evaluate } = getBingoConfig();
+  const triggered = evaluate(tiles, buildCountedThreads(events));
   if (triggered.length) {
     console.log(`[bingo-batch] Triggered: ${triggered.map((t) => t.valueKey).join(', ')}`);
   }
 
   const TILE_TTL = 60 * 60 * 24 * 8;
   for (const { valueKey, triggeredBy } of triggered) {
-    if (!TILE_VALIDATORS.some((t) => t.valueKey === valueKey)) continue;
+    if (!tiles.some((t) => t.valueKey === valueKey)) continue;
 
     const globalKey = `bot:bingo:game:${gameId}:value:${valueKey}`;
     const byKey = `bot:bingo:game:${gameId}:triggered-by:${valueKey}`;

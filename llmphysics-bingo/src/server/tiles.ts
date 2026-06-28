@@ -6,31 +6,8 @@ import {
   dunningKrugerMention, notEvenWrong, citationNeeded, whereMath, thatsAGreatQuestion,
   xkcd3155, unrenderedLatex, quarantineDiscourse, llmsCantDoMath, explainWithoutLlm,
   opCantDoMath, isOpQualified, didYouReadYourPost, didYouReadMyPost,
-  type CountedThread,
 } from './deterministic-tiles';
-
-export type BingoEventType = 'post_submit' | 'comment_create' | 'post_delete' | 'post_report' | 'comment_report' | 'mod_action';
-
-export type BingoEvent = {
-  type: BingoEventType;
-  ts: number;
-  author?: string;
-  title?: string;
-  body?: string;
-  flair?: string;
-  postId?: string;
-  meta?: string;
-};
-
-export type TileValidatorDefinition = {
-  valueKey: string;
-  validate: (thread: CountedThread) => boolean;
-  /** Optional: when validate fires, return the username most responsible. null = community trigger. */
-  attribute?: (thread: CountedThread) => string | null;
-  displayName?: string;
-  label: string;
-  gameDescription?: string;
-};
+export type { TileValidatorDefinition, BingoEvent, BingoEventType } from '@llmphysics/bingo-core/types';
 
 export const TILE_VALIDATORS: TileValidatorDefinition[] = [
   {

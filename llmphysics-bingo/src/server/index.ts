@@ -3,6 +3,7 @@ import { getRequestListener } from '@hono/node-server';
 import { createServer, getServerPort } from '@devvit/server';
 import type { TriggerResponse } from '@devvit/web/shared';
 import {
+  initBingoCore,
   capturePostEvent,
   captureCommentEvent,
   capturePostReportEvent,
@@ -19,7 +20,18 @@ import {
   clearTestBatch,
   getSimulation,
   runSimulationFetchDay,
-} from './bingo';
+} from '@llmphysics/bingo-core';
+import { TILE_VALIDATORS } from './tiles';
+import { buildCountedThreadsFromEvents, evaluate } from './deterministic-tiles';
+
+// ─── Init ─────────────────────────────────────────────────────────────────────
+
+initBingoCore({
+  postTitle: 'LLMPhysics Bingo!',
+  tiles: TILE_VALIDATORS,
+  buildCountedThreads: buildCountedThreadsFromEvents,
+  evaluate,
+});
 
 const app = new Hono();
 

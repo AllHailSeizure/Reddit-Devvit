@@ -1,8 +1,12 @@
-import type { TileValidatorDefinition } from './types';
+import type { TileValidatorDefinition, BingoEvent, CountedThread, TriggeredTile } from './types';
 
 export interface BingoConfig {
   postTitle: string;                     // 'LLMPhysics Bingo!'
   tiles: TileValidatorDefinition[];      // tile pool — sub-specific, provided by deployment
+  /** Convert a flat event list into per-thread CountedThread structs. */
+  buildCountedThreads: (events: BingoEvent[]) => CountedThread[];
+  /** Run tile evaluation over the given threads. */
+  evaluate: (tiles: TileValidatorDefinition[], threads: CountedThread[]) => TriggeredTile[];
 }
 
 let _config: BingoConfig | null = null;
