@@ -21,10 +21,7 @@
       "scope": "moderator"
     }
   },
-  "triggers": {
-    "onPostReport": "/internal/triggers/post-report",
-    "onCommentReport": "/internal/triggers/comment-report"
-  },
+  "triggers": {},
   "settings": {
     "global": [
       {
