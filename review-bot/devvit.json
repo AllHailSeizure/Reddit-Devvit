@@ -1,0 +1,66 @@
+{
+  "$schema": "https://developers.reddit.com/schema/config-file.v1.json",
+  "name": "review-bot",
+  "marketingAssets": {
+    "icon": "assets/icon.png"
+  },
+  "server": {
+    "entry": "index.cjs"
+  },
+  "dev": {
+    "subreddit": "llmphysics_dev"
+  },
+  "permissions": {
+    "http": {
+      "domains": ["en.wikipedia.org", "generativelanguage.googleapis.com", "zenodo.org", "eimdgqymjwfljtapnuyl.supabase.co"]
+    },
+    "redis": true,
+    "reddit": {
+      "enable": true,
+      "asUser": ["SUBMIT_COMMENT"],
+      "scope": "moderator"
+    }
+  },
+  "triggers": {
+    "onPostReport": "/internal/triggers/post-report",
+    "onCommentReport": "/internal/triggers/comment-report"
+  },
+  "settings": {
+    "global": [
+      {
+        "type": "string",
+        "name": "geminiApiKey",
+        "label": "Gemini API Key",
+        "helpText": "API key for Google Gemini. Get from https://aistudio.google.com/apikey",
+        "isSecret": true
+      }
+    ],
+    "subreddit": [
+      {
+        "type": "group",
+        "name": "modules",
+        "label": "Modules",
+        "helpText": "Enable or disable bot features"
+      },
+      {
+        "type": "boolean",
+        "name": "adversarialReviewer.enabled",
+        "label": "Adversarial Reviewer",
+        "helpText": "Users can request LLM review of linked papers.",
+        "defaultValue": true,
+        "group": "modules"
+      }
+    ]
+  },
+  "menu": {
+    "items": [
+      {
+        "label": "Request Paper Review",
+        "description": "Request LLM analysis of a linked paper.",
+        "forUserType": "user",
+        "location": "post",
+        "endpoint": "/internal/menu/adversarial-review"
+      }
+    ]
+  }
+}

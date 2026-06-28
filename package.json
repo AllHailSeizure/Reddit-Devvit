@@ -2,7 +2,8 @@
   "workspaces": [
     "packages/*",
     "llmphysics-bot",
-    "llmphysics-bingo"
+    "llmphysics-bingo",
+    "review-bot"
   ],
   "devDependencies": {
     "devvit": "^1.0.0"
