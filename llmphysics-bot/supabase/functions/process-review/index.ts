@@ -64,6 +64,7 @@ interface JobRecord {
   pdf_url: string | null;
   title: string | null;
   body: string | null;
+  subreddit_name: string | null;
 }
 
 async function updateJob(
@@ -194,7 +195,7 @@ Deno.serve(async (req: Request) => {
   const record = payload.record;
   if (!record?.id) return new Response('No record', { status: 400 });
 
-  const { id: jobId, pdf_url: pdfUrl, title, body } = record;
+  const { id: jobId, pdf_url: pdfUrl, title, body, subreddit_name: subredditName } = record;
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
   const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -202,6 +203,7 @@ Deno.serve(async (req: Request) => {
 
   // Fetch system prompt from Supabase Storage; fall back to hardcoded literal if missing.
   // To update: npx supabase storage cp .documentation/adversarial_review_prompt.txt ss:///config/system_prompt.txt --experimental
+  // Sub-specific override: upload to config/system_prompt_<subredditname>.txt (lowercase, no r/ prefix).
   let SYSTEM_PROMPT = SYSTEM_PROMPT_FALLBACK;
   try {
     const res = await fetch(`${supabaseUrl}/storage/v1/object/public/config/system_prompt.txt`);
@@ -213,6 +215,19 @@ Deno.serve(async (req: Request) => {
     }
   } catch (err) {
     console.warn(`storage fetch threw — using fallback system prompt: ${(err as Error).message}`);
+  }
+
+  if (subredditName) {
+    try {
+      const subSlug = subredditName.toLowerCase().replace(/^r\//, '');
+      const res = await fetch(`${supabaseUrl}/storage/v1/object/public/config/system_prompt_${subSlug}.txt`);
+      if (res.ok) {
+        const text = (await res.text()).trim();
+        if (text) { SYSTEM_PROMPT = text; console.log(`system_prompt loaded from storage for r/${subSlug}`); }
+      }
+    } catch (err) {
+      console.warn(`sub-specific prompt fetch threw: ${(err as Error).message}`);
+    }
   }
 
   // Respond immediately — webhook does not need to wait for processing
