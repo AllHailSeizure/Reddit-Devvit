@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Adversarial Reviewer — Privacy Policy</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <h1>Adversarial Reviewer — Privacy Policy</h1>
+  <p class="meta">Last updated: June 2026</p>
+
+  <p>This policy explains what data the Adversarial Reviewer app collects, how it is used, and how it is stored.</p>
+
+  <h2>1. Data collected</h2>
+  <p>The app processes the following data when you request a review:</p>
+  <ul>
+    <li><strong>Reddit user ID</strong> — to enforce the per-user daily request quota and to record structured logs</li>
+    <li><strong>Post ID</strong> — to identify the submission, enforce the 7-day per-post deduplication lock, and associate logs with content</li>
+    <li><strong>Post title and body text</strong> — sent to Google's Gemini API as part of the review prompt (body truncated to 8,000 characters)</li>
+    <li><strong>Post URLs</strong> — to identify linked manuscripts (arXiv, Zenodo, figshare, and similar sources); the selected URL is included in the review job</li>
+  </ul>
+  <p>The app does not collect email addresses, IP addresses, or any off-Reddit personal information.</p>
+
+  <h2>2. Data storage</h2>
+  <p><strong>Devvit Redis</strong> — The following transient data is stored in Devvit's per-app Redis store, scoped to this app's installation:</p>
+  <ul>
+    <li>Per-post deduplication lock — expires after 7 days</li>
+    <li>Per-user daily quota counter — expires on a rolling 24-hour basis</li>
+    <li>Pending and retry job queues — cleared when jobs complete or are abandoned</li>
+    <li>Form context (selected URL during multi-URL posts) — expires after 5 minutes</li>
+  </ul>
+  <p><strong>Supabase</strong> — Review jobs are written to a Supabase database operated by the moderator team. Each job record contains the post ID, selected URL (if any), post title, post body, and processing status. Job records are deleted once the review comment has been posted. Structured logs (module name, event type, action taken, Reddit user ID, post/comment ID — no body text) are retained at moderator discretion.</p>
+
+  <h2>3. Third-party services</h2>
+  <p><strong>AI review service</strong> — Post title, body text, and content from the linked document are sent to a third-party AI service to generate the review. That provider's privacy policy applies to that processing.</p>
+  <p><strong>Zenodo</strong> — The app may fetch PDF content from Zenodo to include in the review. No user data is sent to Zenodo.</p>
+
+  <h2>4. Data sharing</h2>
+  <p>Data processed by the app is not sold or shared with third parties except as described above (Google Gemini for review generation).</p>
+
+  <h2>5. Data retention</h2>
+  <p>Redis data expires automatically per the TTLs listed above. Supabase review job records are deleted on completion. Structured logs are retained at moderator discretion. You may request deletion of log entries referencing your user ID by contacting the moderators via modmail.</p>
+
+  <h2>6. Your rights</h2>
+  <p>Reddit's own <a href="https://www.reddit.com/policies/privacy-policy">Privacy Policy</a> governs Reddit's handling of your data. For data stored by this app, contact the r/llmphysics moderators via modmail.</p>
+
+  <h2>Contact</h2>
+  <p><a href="https://www.reddit.com/message/compose/?to=/r/llmphysics">Message the r/llmphysics moderators</a>.</p>
+</body>
+</html>
