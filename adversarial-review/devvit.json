@@ -1,0 +1,104 @@
+{
+  "$schema": "https://developers.reddit.com/schema/config-file.v1.json",
+  "name": "adversarial-review",
+  "marketingAssets": {
+    "icon": "assets/icon.png"
+  },
+  "server": {
+    "entry": "index.cjs"
+  },
+  "dev": {
+    "subreddit": "llmphysics_dev"
+  },
+  "permissions": {
+    "http": {
+      "domains": ["generativelanguage.googleapis.com", "eimdgqymjwfljtapnuyl.supabase.co"]
+    },
+    "redis": true,
+    "reddit": {
+      "enable": true,
+      "asUser": ["SUBMIT_COMMENT"],
+      "scope": "moderator"
+    }
+  },
+  "triggers": {},
+  "scheduler": {
+    "tasks": {
+      "pdf-review-poll": {
+        "endpoint": "/internal/scheduler/pdf-review-poll",
+        "cron": "*/5 * * * *"
+      }
+    }
+  },
+  "menu": {
+    "items": [
+      {
+        "label": "Request Adversarial LLM Review",
+        "description": "Request LLM review of your post. Includes linked content.",
+        "forUserType": "user",
+        "location": "post",
+        "endpoint": "/internal/menu/adversarial-review"
+      }
+    ]
+  },
+  "forms": {
+    "adversarial-no-link":      "/internal/forms/adversarial-no-link",
+    "adversarial-multi-link":   "/internal/forms/adversarial-multi-link"
+  },
+  "settings": {
+    "global": {
+      "supabaseUrl": {
+        "type": "string",
+        "label": "Supabase project URL",
+        "helpText": "https://YOUR_PROJECT.supabase.co — used for the async PDF review queue.",
+        "isSecret": false
+      },
+      "supabaseServiceRoleKey": {
+        "type": "string",
+        "label": "Supabase service role key",
+        "helpText": "Service role key for the review_jobs table. Keep secret.",
+        "isSecret": true
+      },
+      "supabaseServiceKey": {
+        "type": "string",
+        "label": "Supabase service key",
+        "helpText": "Service key for writing bot logs. Keep secret.",
+        "isSecret": true
+      }
+    },
+    "subreddit": {
+      "adversarialReviewerEnabled": {
+        "type": "boolean",
+        "label": "Adversarial Reviewer — Enable",
+        "helpText": "Enable or disable the Adversarial Reviewer action.",
+        "defaultValue": false
+      },
+      "adversarialReviewerFlairId": {
+        "type": "string",
+        "label": "Adversarial Reviewer — Required flair template ID",
+        "helpText": "If set, only posts with this flair can request a review. Leave blank to allow any post."
+      },
+      "adversarialReviewerStickyComment": {
+        "type": "boolean",
+        "label": "Adversarial Reviewer — Sticky review comment",
+        "helpText": "Sticky the review comment to the top of the post after posting.",
+        "defaultValue": false
+      },
+      "adversarialReviewerLockComment": {
+        "type": "boolean",
+        "label": "Adversarial Reviewer — Lock review comment",
+        "helpText": "Lock the review comment after posting.",
+        "defaultValue": false
+      },
+      "botSignature": {
+        "type": "paragraph",
+        "label": "Bot signature",
+        "helpText": "Appended to all bot comments. Leave blank for no signature.",
+        "defaultValue": "I am a bot. This action was performed automatically. Contact the moderators if you have questions."
+      }
+    }
+  },
+  "scripts": {
+    "build": "npm run build"
+  }
+}
