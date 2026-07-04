@@ -1,21 +1,27 @@
-# Reddit Devvit Apps — Legal Documentation
+---
+layout: default
+title: Legal Documentation
+permalink: /
+---
+
+# Reddit Devvit Apps - Legal Documentation
 
 This site hosts the Terms of Service and Privacy Policies for our Reddit Devvit applications.
 
 ## Moderator Toolbox
 
-- [Terms of Service](moderator-toolbox-terms.md)
-- [Privacy Policy](moderator-toolbox-privacy.md)
+- [Terms of Service]({{ site.baseurl }}/moderator-toolbox/terms/)
+- [Privacy Policy]({{ site.baseurl }}/moderator-toolbox/privacy/)
 
 ## Subreddit Bingo
 
-- [Terms of Service](sub-bingo-terms.md)
-- [Privacy Policy](sub-bingo-privacy.md)
+- [Terms of Service]({{ site.baseurl }}/sub-bingo/terms/)
+- [Privacy Policy]({{ site.baseurl }}/sub-bingo/privacy/)
 
 ## Adversarial Review
 
-- [Terms of Service](adversarial-review-terms.md)
-- [Privacy Policy](adversarial-review-privacy.md)
+- [Terms of Service]({{ site.baseurl }}/adversarial-review/terms/)
+- [Privacy Policy]({{ site.baseurl }}/adversarial-review/privacy/)
 
 ---
 

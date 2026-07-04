@@ -1,4 +1,10 @@
-# Adversarial Review — Privacy Policy
+---
+layout: default
+title: Adversarial Review - Privacy Policy
+permalink: /adversarial-review/privacy/
+---
+
+# Adversarial Review - Privacy Policy
 
 **Effective Date:** July 4, 2026
 

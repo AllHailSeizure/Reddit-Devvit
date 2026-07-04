@@ -1,4 +1,10 @@
-# Subreddit Bingo — Terms of Service
+---
+layout: default
+title: Subreddit Bingo - Terms of Service
+permalink: /sub-bingo/terms/
+---
+
+# Subreddit Bingo - Terms of Service
 
 **Effective Date:** July 4, 2026
 

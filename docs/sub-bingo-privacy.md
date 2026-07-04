@@ -1,4 +1,10 @@
-# Subreddit Bingo — Privacy Policy
+---
+layout: default
+title: Subreddit Bingo - Privacy Policy
+permalink: /sub-bingo/privacy/
+---
+
+# Subreddit Bingo - Privacy Policy
 
 **Effective Date:** July 4, 2026
 

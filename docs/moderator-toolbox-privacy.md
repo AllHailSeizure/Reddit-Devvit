@@ -1,4 +1,10 @@
-# Moderator Toolbox — Privacy Policy
+---
+layout: default
+title: Moderator Toolbox - Privacy Policy
+permalink: /moderator-toolbox/privacy/
+---
+
+# Moderator Toolbox - Privacy Policy
 
 **Effective Date:** July 4, 2026
 

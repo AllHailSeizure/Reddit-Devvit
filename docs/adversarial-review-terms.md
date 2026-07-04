@@ -1,4 +1,10 @@
-# Adversarial Review — Terms of Service
+---
+layout: default
+title: Adversarial Review - Terms of Service
+permalink: /adversarial-review/terms/
+---
+
+# Adversarial Review - Terms of Service
 
 **Effective Date:** July 4, 2026
 

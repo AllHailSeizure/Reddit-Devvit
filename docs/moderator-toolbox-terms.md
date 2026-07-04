@@ -1,4 +1,10 @@
-# Moderator Toolbox — Terms of Service
+---
+layout: default
+title: Moderator Toolbox - Terms of Service
+permalink: /moderator-toolbox/terms/
+---
+
+# Moderator Toolbox - Terms of Service
 
 **Effective Date:** July 4, 2026
 
