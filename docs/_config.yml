@@ -2,5 +2,5 @@ theme: jekyll-theme-minimal
 title: Reddit Devvit Apps - Legal Documentation
 description: Terms of Service and Privacy Policies
 url: "https://allhailseizure.github.io"
-baseurl: "/llmphysics"
+baseurl: "/Reddit-Devvit"
 markdown: kramdown
