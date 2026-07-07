@@ -13,11 +13,7 @@
     "skipLibCheck": true,
     "sourceMap": true,
     "declaration": true,
-    "resolveJsonModule": true,
-    "paths": {
-      "@llmphysics/bingo-core": ["../packages/bingo-core/src/index.ts"],
-      "@llmphysics/bingo-core/*": ["../packages/bingo-core/src/*"]
-    }
+    "resolveJsonModule": true
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist", "src/client/**/*"]

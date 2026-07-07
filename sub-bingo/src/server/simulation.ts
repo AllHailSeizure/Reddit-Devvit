@@ -1,6 +1,6 @@
 import { redis } from '@devvit/redis';
 import { reddit } from '@devvit/web/server';
-import type { BingoEvent } from './types';
+import type { BingoEvent } from './tiles';
 import { evaluateEvents } from './validator';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -10,7 +10,7 @@ export type SimDay = {
   dayStartTs: number;      // unix ms, UTC midnight
   dayEndTs: number;        // unix ms, end of window (exclusive)
   triggeredKeys: string[]; // CUMULATIVE — all keys triggered through days 0..dayIndex (for MC)
-  dayKeys: string[];       // NON-CUMULATIVE — raw evaluator output for this day only (for frequency)
+  dayKeys: string[];       // NON-CUMULATIVE — raw Gemini output for this day only (for frequency)
   postsScanned: number;
   commentsScanned: number;
 };
@@ -60,7 +60,7 @@ export async function clearSimulationData(): Promise<void> {
 // ─── fetchDaySlice ────────────────────────────────────────────────────────────
 
 /**
- * Fetch one 24h window of subreddit activity, run evaluateEvents against it,
+ * Fetch one 24h window of subreddit activity, run evaluateTestEvents against it,
  * and return a SimDay (dayIndex is set to -1 sentinel; caller sets the real value).
  * Does NOT write to Redis — the route handler owns persistence.
  *

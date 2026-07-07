@@ -1,6 +1,6 @@
 export type TileTrigger = { valueKey: string; firstTriggerAt: number | null; triggeredBy: string | null; fireCount: number };
 
-/** 5 rows, 5 cols, 2 diagonals — same set as bingo.ts checkWin. */
+/** 5 rows, 5 cols, 2 diagonals — same set as src/server/bingo.ts checkWin. */
 export const WIN_LINES: number[][] = (() => {
   const lines: number[][] = [];
   for (let r = 0; r < 5; r++) lines.push([0, 1, 2, 3, 4].map((c) => r * 5 + c));

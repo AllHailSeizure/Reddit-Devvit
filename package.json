@@ -2,7 +2,7 @@
   "workspaces": [
     "packages/*",
     "llmphysics-bot",
-    "llmphysics-bingo",
+    "sub-bingo",
     "review-bot"
   ],
   "devDependencies": {

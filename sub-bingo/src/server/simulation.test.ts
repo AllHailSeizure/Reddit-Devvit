@@ -166,7 +166,7 @@ describe('fetchDaySlice', () => {
     const result = await fetchDaySlice('llmphysics', DAY_START, DAY_END, ['consciousness-drop']);
     expect(result.triggeredKeys).toContain('resonance-drop');
     expect(result.triggeredKeys).toContain('consciousness-drop');
-    // dayKeys is non-cumulative: only what the evaluator returned THIS day
+    // dayKeys is non-cumulative: only what Gemini returned THIS day
     expect(result.dayKeys).toContain('resonance-drop');
     expect(result.dayKeys).not.toContain('consciousness-drop');
   });
@@ -180,7 +180,7 @@ describe('fetchDaySlice', () => {
     expect(dupeCount).toBe(1);
   });
 
-  it('skips evaluation call when no events were found', async () => {
+  it('skips Gemini call when no events were found', async () => {
     vi.mocked(reddit.getNewPosts).mockReturnValue(makeListing([]) as any);
     await fetchDaySlice('llmphysics', DAY_START, DAY_END, []);
     expect(mockEval).not.toHaveBeenCalled();
