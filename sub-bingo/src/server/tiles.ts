@@ -1,0 +1,269 @@
+import {
+  emDashEpidemic, twoPersonWar, commentPurge, commentExplosion, depthCapSpiral, dominantEmDashContributor,
+  tearMeApart, coherenceDrop, resonanceDrop, ontologyDrop, consciousnessDrop, frameworkDrop,
+  cosmologicalConstantDrop, hubbleTensionDrop, toroidalDrop, fullyFalsifiableDrop, emergentDrop,
+  scalarFieldDrop, tensorDrop, lean4Proof, unfinishedWorkDisclaimer,
+  dunningKrugerMention, notEvenWrong, citationNeeded, whereMath, thatsAGreatQuestion,
+  xkcd3155, unrenderedLatex, quarantineDiscourse, llmsCantDoMath, explainWithoutLlm,
+  opCantDoMath, isOpQualified, didYouReadYourPost, didYouReadMyPost,
+  type CountedThread,
+} from './deterministic-tiles';
+
+export type BingoEventType = 'post_submit' | 'comment_create' | 'post_delete' | 'post_report' | 'comment_report' | 'mod_action';
+
+export type BingoEvent = {
+  type: BingoEventType;
+  ts: number;
+  author?: string;
+  title?: string;
+  body?: string;
+  flair?: string;
+  postId?: string;
+  meta?: string;
+};
+
+export type TileValidatorDefinition = {
+  valueKey: string;
+  validate: (thread: CountedThread) => boolean;
+  /** Optional: when validate fires, return the username most responsible. null = community trigger. */
+  attribute?: (thread: CountedThread) => string | null;
+  displayName?: string;
+  label: string;
+  gameDescription?: string;
+};
+
+export const TILE_VALIDATORS: TileValidatorDefinition[] = [
+  {
+    valueKey: 'tear-me-apart',
+    validate: tearMeApart,
+    displayName: 'Tear Me Apart',
+    label: 'Tear My Theory Apart',
+    gameDescription: "Tear me apart, fam. Wait - are you actually gonna do it?",
+  },
+  {
+    valueKey: 'coherence-drop',
+    validate: coherenceDrop,
+    displayName: 'Coherence',
+    label: '"Coherence" in a Post',
+    gameDescription: 'Do 99% of posts referencing this realize what this means in physics?',
+  },
+  {
+    valueKey: 'resonance-drop',
+    validate: resonanceDrop,
+    displayName: 'Resonance',
+    label: '"Resonance" in a Post',
+    gameDescription: 'I considered making this the free square.',
+  },
+  {
+    valueKey: 'ontology-drop',
+    validate: ontologyDrop,
+    displayName: 'Ontology',
+    label: '"Ontology" in a Post',
+    gameDescription: 'Why on earth are we so obsessed with this word.',
+  },
+  {
+    valueKey: 'unrendered-latex',
+    validate: unrenderedLatex,
+    displayName: 'Unrendered LaTeX',
+    label: 'Unrendered LaTeX in Post',
+    gameDescription: 'Reddit is MD only.',
+  },
+  {
+    valueKey: 'consciousness-drop',
+    validate: consciousnessDrop,
+    displayName: 'Consciousness',
+    label: '"Consciousness" in a Post',
+    gameDescription: 'Surely my awareness is what influences the outside world.',
+  },
+  {
+    valueKey: 'framework-drop',
+    validate: frameworkDrop,
+    displayName: 'Framework',
+    label: '"Framework" in a Post',
+    gameDescription: 'Every hypothesis can be elevated to a framework if you try hard enough.',
+  },
+  {
+    valueKey: 'cosmological-constant-drop',
+    validate: cosmologicalConstantDrop,
+    displayName: 'Cosmological Constant',
+    label: '"Cosmological Constant" in Post',
+    gameDescription: "It sounds too fancy to not engage with it, right?",
+  },
+  {
+    valueKey: 'hubble-tension-drop',
+    validate: hubbleTensionDrop,
+    displayName: 'Hubble Tension',
+    label: '"Hubble Tension" in a Post',
+    gameDescription: 'Hubble Tension: the gift that keeps on giving for LLM theories.',
+  },
+  {
+    valueKey: 'toroidal-drop',
+    validate: toroidalDrop,
+    displayName: 'Toroidal',
+    label: '"Toroidal" in a Post',
+    gameDescription: 'This sub loves bagels.',
+  },
+  {
+    valueKey: 'fully-falsifiable-drop',
+    validate: fullyFalsifiableDrop,
+    displayName: 'Falsifiable',
+    label: '"Falsifiable" in a Post',
+    gameDescription: "Need legitimacy? It's the go to word.",
+  },
+  {
+    valueKey: 'emergent-drop',
+    validate: emergentDrop,
+    displayName: 'Emergent',
+    label: '"Emergent" in a Post',
+    gameDescription: "Everything's gotta come from somewhere I guess.",
+  },
+  {
+    valueKey: 'quarantine-discourse',
+    validate: quarantineDiscourse,
+    displayName: 'Quarantine',
+    label: 'Sub Is LLM Paper Quarantine',
+    gameDescription: 'Ah, a fresh user, time to explain the entire purpose of the sub.',
+  },
+  {
+    valueKey: 'explain-without-llm',
+    validate: explainWithoutLlm,
+    displayName: "Don't use an LLM...",
+    label: '"Explain Without an LLM"',
+    gameDescription: "Use your own words. Please. I'm so sick of moderating LLM comment reports.",
+  },
+  {
+    valueKey: 'thats-a-great-question',
+    validate: thatsAGreatQuestion,
+    displayName: "That's a great question..",
+    label: '"That\'s a Great Question"',
+    gameDescription: 'Would you like me to explain the interesting history behind this tile?',
+  },
+  {
+    valueKey: 'dunning-kruger-mention',
+    validate: dunningKrugerMention,
+    displayName: 'Dunning-Kruger',
+    label: 'Dunning-Kruger in Comments',
+    gameDescription: 'We love psychology on this sub.',
+  },
+  {
+    valueKey: 'not-even-wrong',
+    validate: notEvenWrong,
+    displayName: 'Not Even Wrong.',
+    label: '"Not Even Wrong" Comment',
+    gameDescription: "It's not wrong. It's not right. It's something else entirely.",
+  },
+  /* missing-the-joke — shelved pending design (needs Humorous flair awareness + earnestness check; see GitHub issue) */
+  {
+    valueKey: 'citation-needed',
+    validate: citationNeeded,
+    displayName: '[citation needed]',
+    label: '"Citation Needed" Comment',
+    gameDescription: '[citation needed]',
+  },
+  {
+    valueKey: 'where-math',
+    validate: whereMath,
+    displayName: '"Where Math"',
+    label: 'The "Where Math" Comment',
+    gameDescription: 'Do I need to spell it out for you.',
+  },
+  {
+    valueKey: 'op-cant-do-math',
+    validate: opCantDoMath,
+    displayName: "OP Can't Do the Math",
+    label: "OP Admits They Can't Do the Math",
+    gameDescription: "Can I do the math? No... but I know the idea is right.",
+  },
+  {
+    valueKey: 'llms-cant-do-math',
+    validate: llmsCantDoMath,
+    displayName: "LLMs Can't Do Math",
+    label: '"LLMs Can\'t Do Math" Comment',
+    gameDescription: "The anthem of the sub: 'LLMs can't do math!'",
+  },
+  {
+    valueKey: 'lean4-proof',
+    validate: lean4Proof,
+    displayName: 'Lean 4 Proof',
+    label: 'Lean 4 Proof as Evidence',
+    gameDescription: "This can't be wrong, I verified it in Lean 4..",
+  },
+  {
+    valueKey: 'two-person-war',
+    validate: twoPersonWar,
+    displayName: 'Comment War',
+    label: 'Two-Person Comment War',
+    gameDescription: 'One post. 50+ comments. 75% by OP and one other user.',
+  },
+  {
+    valueKey: 'em-dash-epidemic',
+    validate: emDashEpidemic,
+    attribute: dominantEmDashContributor,
+    displayName: 'Em-Dash Epidemic',
+    label: '40 Em-Dashes in One Post',
+    gameDescription: 'A cruel twist of fate leads to a thread with more than 40 em-dashes over the course of its lifetime.',
+  },
+  {
+    valueKey: 'unfinished-work-disclaimer',
+    validate: unfinishedWorkDisclaimer,
+    displayName: "This Isn't Complete..",
+    label: 'Explicitly Incomplete Work',
+    gameDescription: "Now, this theory isn't complete, but..",
+  },
+  {
+    valueKey: 'did-you-read-your-post',
+    validate: didYouReadYourPost,
+    displayName: 'Did You Read Your Post?',
+    label: '"Did You Read Your Post?"',
+    gameDescription: 'Did you even read this before posting? Sigh.',
+  },
+  {
+    valueKey: 'did-you-read-my-post',
+    validate: didYouReadMyPost,
+    displayName: 'Did You Read My Post?',
+    label: '"Did You Read MY Post?"',
+    gameDescription: "I can tell by your criticism you didn't even read my post, did you?",
+  },
+  {
+    valueKey: 'comment-purge',
+    validate: commentPurge,
+    displayName: 'Moderation Rampage',
+    label: '7+ Comments Removed in Post',
+    gameDescription: 'A post is subjected to a purge from the tyrant oppressors of the sub, who delete 7 or more comments in their crusade of censorship.',
+  },
+  {
+    valueKey: 'scalar-field-drop',
+    validate: scalarFieldDrop,
+    displayName: 'Scalar Field',
+    label: '"Scalar Field" in a Post',
+    gameDescription: 'A less legit sounding tensor field..',
+  },
+  {
+    valueKey: 'tensor-drop',
+    validate: tensorDrop,
+    displayName: 'Tensor',
+    label: '"Tensor" in a Post',
+    gameDescription: 'A more legit sounding scalar field.',
+  },
+  {
+    valueKey: 'comment-explosion',
+    validate: commentExplosion,
+    displayName: '120 Comments',
+    label: '120+ Comments on a Post',
+    gameDescription: 'WTF guys?',
+  },
+  {
+    valueKey: 'xkcd-3155',
+    validate: xkcd3155,
+    displayName: 'XKCD 3155',
+    label: 'Someone Cites XKCD 3155',
+    gameDescription: 'The citation you will see 1000 times.',
+  },
+  {
+    valueKey: 'is-op-qualified',
+    validate: isOpQualified,
+    displayName: 'OP = Physicist?',
+    label: 'OP = Physicist?',
+    gameDescription: "The gatekeeper's go-to weapon.",
+  },
+];

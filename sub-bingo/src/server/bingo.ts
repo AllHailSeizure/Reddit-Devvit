@@ -2,7 +2,7 @@ import { context, reddit, settings } from '@devvit/web/server';
 import { redis } from '@devvit/redis';
 import { TILE_VALIDATORS, type BingoEvent } from './tiles';
 import { runPacing, type TileTrigger } from './pacing';
-import { appendBingoEvent, runBatchValidation, evaluateTestEvents } from './validator';
+import { appendBingoEvent, runBatchValidation, evaluateEvents } from './validator';
 import { readSetting, writeSetting } from './settings';
 import type { OnCommentCreateRequest, OnPostSubmitRequest, OnPostReportRequest, OnModActionRequest, OnCommentReportRequest } from '@devvit/web/shared';
 import {
@@ -226,7 +226,7 @@ async function announceWinners(gameId: string): Promise<void> {
     let username: string | undefined;
     try {
       const user = await reddit.getUserById(userId as `t2_${string}`);
-      username = user?.username?.toLowerCase();
+      username = user?.username;
     } catch {
       // self-trigger check skipped for this user
     }
@@ -242,11 +242,11 @@ async function announceWinners(gameId: string): Promise<void> {
 
       let message: string;
       if (isFirstWinner) {
-        message = firstWinnerTemplate.replace('{userId}', userId);
+        message = firstWinnerTemplate.replace('{userId}', username ?? userId);
         await redis.set(`bot:bingo:game:${gameId}:won`, '1');
         await redis.expire(`bot:bingo:game:${gameId}:won`, GAME_TTL_SECS);
       } else {
-        message = bingoTemplate.replace('{userId}', userId);
+        message = bingoTemplate.replace('{userId}', username ?? userId);
       }
 
       try {
@@ -259,7 +259,7 @@ async function announceWinners(gameId: string): Promise<void> {
     }
 
     if (isFullCard && !announcedFullCard.includes(userId)) {
-      const message = fullCardTemplate.replace('{userId}', userId);
+      const message = fullCardTemplate.replace('{userId}', username ?? userId);
       try {
         await reddit.submitComment({ id: gameId as `t3_${string}`, text: message });
       } catch (err) {
@@ -421,13 +421,9 @@ export async function getBingoState(c: { req: { query: (k: string) => string | u
   const isMod = username
     ? (await reddit.getModerators({ subredditName, username }).all()).length > 0
     : false;
-  if (!isMod) {
-    return c.json({ operatorView: true });
-  }
-
   squares = await checkTiles(squares, gameId, username);
   const { hasWin, winningIndices } = checkWin(squares);
-  return c.json({ squares, hasWin, winningIndices, isMod: true });
+  return c.json({ squares, hasWin, winningIndices, isMod });
 }
 
 export async function getBingoStats(c: { req: { query: (k: string) => string | undefined }; json: (v: unknown, s?: number) => Response }): Promise<Response> {
@@ -516,8 +512,7 @@ export async function bingoSchedulerRun(c: { json: (v: unknown, s?: number) => R
       return c.json({ status: 'round reset' });
     }
 
-    const geminiApiKey = await settings.get<string>('geminiApiKey');
-    await runBatchValidation(geminiApiKey ?? '', gameId);
+    await runBatchValidation(gameId);
     await announceWinners(gameId);
     return c.json({ status: 'ok' });
   } catch (error) {
@@ -557,8 +552,7 @@ export async function postBingoSettings(c: { req: { json: <T>() => Promise<T> };
     if (!activeGame) messages.push('No active game to validate.');
     else {
       try {
-        const geminiApiKey = await settings.get<string>('geminiApiKey');
-        await runBatchValidation(geminiApiKey ?? '', activeGame.gameId);
+        await runBatchValidation(activeGame.gameId);
         await announceWinners(activeGame.gameId);
         messages.push('Batch validation ran.');
       } catch (err) { messages.push(`Batch failed: ${(err as Error).message}`); }
@@ -602,8 +596,7 @@ export async function runTestValidation(c: { json: (v: unknown, s?: number) => R
   if (events.length === 0) return c.json({ ok: true, triggered: [], batchSize: 0, message: 'Test batch is empty.' });
 
   try {
-    const geminiApiKey = await settings.get<string>('geminiApiKey');
-    const triggered = await evaluateTestEvents(geminiApiKey ?? '', events);
+    const triggered = evaluateEvents(events);
     const result = triggered.map((t) => ({
       valueKey: t.valueKey,
       label: TILE_VALIDATORS.find((v) => v.valueKey === t.valueKey)?.displayName ?? t.valueKey,
@@ -655,8 +648,6 @@ export async function runSimulationFetchDay(
   const subredditName = context.subredditName ?? '';
   if (!subredditName) return c.json({ ok: false, reason: 'No subreddit context.' });
 
-  const geminiApiKey = (await settings.get<string>('geminiApiKey')) ?? '';
-
   let data: SimulationData | null = await getSimulationData();
   const pool = TILE_VALIDATORS.map((t) => t.valueKey);
 
@@ -676,7 +667,7 @@ export async function runSimulationFetchDay(
   const prevKeys = sortedDays.length > 0 ? sortedDays[sortedDays.length - 1]!.triggeredKeys : [];
 
   try {
-    const simDay = await fetchDaySlice(subredditName, dayStartTs, dayEndTs, geminiApiKey, prevKeys);
+    const simDay = await fetchDaySlice(subredditName, dayStartTs, dayEndTs, prevKeys);
     simDay.dayIndex = dayIndex;
     data.days = [...data.days.filter((d) => d.dayIndex !== dayIndex), simDay]
       .sort((a, b) => a.dayIndex - b.dayIndex);
