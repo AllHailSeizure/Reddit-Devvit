@@ -15,9 +15,9 @@
   },
   "permissions": {
     "media": true,
+    "redis": true,
     "reddit": {
-      "enable": true,
-      "asUser": ["SUBMIT_COMMENT"]
+      "enable": true
     }
   },
   "menu": {
