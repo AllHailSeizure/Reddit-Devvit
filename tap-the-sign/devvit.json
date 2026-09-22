@@ -1,0 +1,36 @@
+{
+  "$schema": "https://developers.reddit.com/schema/config-file.v1.json",
+  "name": "tap-the-sign",
+  "marketingAssets": {
+    "icon": "assets/icon.png"
+  },
+  "server": {
+    "entry": "index.cjs"
+  },
+  "dev": {
+    "subreddit": "llmphysics_dev"
+  },
+  "media": {
+    "dir": "assets"
+  },
+  "permissions": {
+    "media": true,
+    "reddit": {
+      "enable": true,
+      "asUser": ["SUBMIT_COMMENT"]
+    }
+  },
+  "menu": {
+    "items": [
+      {
+        "label": "Tap the Sign",
+        "forUserType": "user",
+        "location": "post",
+        "endpoint": "/internal/menu/tap-the-sign"
+      }
+    ]
+  },
+  "scripts": {
+    "build": "npm run build"
+  }
+}

@@ -3,7 +3,8 @@
     "packages/*",
     "llmphysics-bot",
     "sub-bingo",
-    "review-bot"
+    "review-bot",
+    "tap-the-sign"
   ],
   "devDependencies": {
     "devvit": "^1.0.0"
