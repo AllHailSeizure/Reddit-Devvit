@@ -16,6 +16,14 @@ There are two ways to interact with it:
 
 ## Automatic Rules
 
+### Responding to Commenters (Nonresponder Check)
+
+When someone posts, the bot checks their last 2 qualifying previous posts here. Each needs at least 3 total Reddit comments, including bot and OP comments. If the author left no surviving comments on either post, the bot leaves a stickied, distinguished, locked reminder on the new post. The post stays open for discussion.
+
+Moderators, approved submitters, and configured bots are exempt by default. The check scans only the author's 50 most recent posts; insufficient history or an incomplete comment scan means no warning. In the app installation settings, use `nonresponderModEnabled` (default true), `nonresponderPostsToCheck` (2), `nonresponderMinComments` (3), `nonresponderIgnoreModerators` (true), `nonresponderIgnoreContributors` (true), and `nonresponderResponse` (the rule reminder). Blank warning text suppresses posting.
+
+---
+
 ### Posting Quota (Flood Moderator)
 
 The bot limits how often a user can post. By default, a user can post once every 24 hours. If someone posts more than that, their extra post is automatically removed.

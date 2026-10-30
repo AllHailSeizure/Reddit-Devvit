@@ -55,6 +55,7 @@ src/server/
 │   ├── flood-moderator.ts           Post quota enforcement
 │   ├── depth-cap-moderator.ts       Comment depth enforcement
 │   ├── self-response-moderator.ts   OP self-reply enforcement
+│   ├── nonresponder-check.ts        OP participation warning
 │   ├── length-moderator.ts          Post length enforcement
 │   └── report-moderator.ts          Bot-report ignorer
 ├── action-modules/
@@ -129,6 +130,25 @@ In the Devvit app settings panel (accessible via the subreddit's app settings), 
 ---
 
 ## Trigger Modules
+
+### Nonresponder Check
+
+On post submit, checks the author's latest 2 qualifying previous posts in this subreddit, within their 50 most recent posts across Reddit. Each must have at least 3 comments according to Reddit's total `numberOfComments` (including OP, bots, and removed comments). Removed, spam, and deleted posts are skipped. If neither post contains a surviving OP comment at any reply depth, the app posts a distinguished, stickied, locked warning on the new post, with `botSignature`. The post stays open.
+
+Bots in deployment config, AutoModerator, and the app itself are exempt. Moderators and approved submitters are exempt by default. Missing authors, insufficient history, API failures, and incomplete comment scans produce no warning. Each tree is limited to 500 comments and 50 listings; hitting either limit skips enforcement. A seven-day atomic Redis claim prevents duplicate warning submissions within that window.
+
+Settings are in the app installation settings (`devvit.json` → `settings.subreddit`):
+
+| Key | Default |
+|-----|---------|
+| `nonresponderModEnabled` | `true` |
+| `nonresponderPostsToCheck` | `2` (1–10) |
+| `nonresponderMinComments` | `3` (1–100) |
+| `nonresponderIgnoreModerators` | `true` |
+| `nonresponderIgnoreContributors` | `true` |
+| `nonresponderResponse` | Responding to commenters is a subreddit rule. You did not respond on your recent qualifying posts. Please engage with the comments on this post by replying to commenters. |
+
+Invalid numeric thresholds use defaults. A blank warning suppresses posting. Live testing should verify nested replies, removed/deleted comments, exemption settings, duplicate delivery, and warning locking/stickying. Local decision tests: `npm test -w @llmphysics/bot-core`.
 
 ### Flood Moderator
 

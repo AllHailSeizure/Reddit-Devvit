@@ -16,7 +16,7 @@ Playtest URL (re-add manually when a post opens in a new tab):
 https://www.reddit.com/r/llmphysics_dev/?playtest=llmphysics-bot
 ```
 
-There is no test runner. Validation is done manually via `devvit logs` during playtest.
+Bot-core nonresponder decision tests run locally with `npm test -w @llmphysics/bot-core`. Reddit API behavior is validated manually during playtest.
 
 ---
 
@@ -254,3 +254,6 @@ All levels write to console (visible via `devvit logs`). Each level is also pers
 
 **NEVER auto-bump the version to work around deployment errors.** If `devvit playtest` fails with "AppVersion already exists," ask first before changing `package.json` version. The issue is usually environmental (lingering process, platform state) and will resolve itself or needs manual investigation — not a version bump band-aid.
 
+## Nonresponder Check
+
+Shared module: `packages/bot-core/src/trigger-modules/nonresponder-check.ts`, exported as `runNonresponderCheck` and registered in `POST_SUBMIT`. Settings are platform settings in `devvit.json` (`nonresponderModEnabled`, `nonresponderPostsToCheck` 2, `nonresponderMinComments` 3, `nonresponderIgnoreModerators`, `nonresponderIgnoreContributors`, `nonresponderResponse`). Redis keys: `bot:nrmod:handled:{postId}`, `bot:nrmod:log`. Eligibility uses total `numberOfComments`; OP participation includes nested surviving comments. See README for scan limits and failure behavior.

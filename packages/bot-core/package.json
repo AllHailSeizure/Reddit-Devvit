@@ -7,5 +7,8 @@
   "peerDependencies": {
     "@devvit/web": "^0.13.4",
     "hono": "^4.0.0"
+  },
+  "scripts": {
+    "test": "vitest run src/trigger-modules/nonresponder-decision.test.ts"
   }
 }

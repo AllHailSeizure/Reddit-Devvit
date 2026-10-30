@@ -335,6 +335,42 @@
         "label": "Adversarial Reviewer — Lock review comment",
         "helpText": "Lock the review comment after posting.",
         "defaultValue": false
+      },
+      "nonresponderModEnabled": {
+        "type": "boolean",
+        "label": "Nonresponder Check — Enable",
+        "helpText": "Enable or disable the nonresponder check (runs on post submit).",
+        "defaultValue": true
+      },
+      "nonresponderPostsToCheck": {
+        "type": "number",
+        "label": "Nonresponder Check — Previous posts to check",
+        "helpText": "Number of qualifying previous posts that must all lack an OP reply (1–10). Default: 2.",
+        "defaultValue": 2
+      },
+      "nonresponderMinComments": {
+        "type": "number",
+        "label": "Nonresponder Check — Minimum comments per post",
+        "helpText": "A previous post only counts if it has at least this many comments (1–100). Default: 3.",
+        "defaultValue": 3
+      },
+      "nonresponderIgnoreModerators": {
+        "type": "boolean",
+        "label": "Nonresponder Check — Ignore moderators",
+        "helpText": "If enabled, the nonresponder check will not apply to moderators.",
+        "defaultValue": true
+      },
+      "nonresponderIgnoreContributors": {
+        "type": "boolean",
+        "label": "Nonresponder Check — Ignore approved users",
+        "helpText": "If enabled, the nonresponder check will not apply to approved users.",
+        "defaultValue": true
+      },
+      "nonresponderResponse": {
+        "type": "paragraph",
+        "label": "Nonresponder Check — Warning comment",
+        "helpText": "Commented (distinguished, stickied, locked) on the new post when the author is a nonresponder. Leave blank to post nothing.",
+        "defaultValue": "Responding to commenters is a subreddit rule. You did not respond on your recent qualifying posts. Please engage with the comments on this post by replying to commenters."
       }
     }
   },

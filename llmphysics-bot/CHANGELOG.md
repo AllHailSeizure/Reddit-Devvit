@@ -6,6 +6,8 @@ All notable changes to llmphysics-bot. Format: `module(<scope>): description`.
 
 ## [Unreleased]
 
+- `module(nonresponder-check)`: Warn nonresponding authors on post submit; configurable history/comment thresholds (2/3), exemptions, warning text, bounded scans, and duplicate protection.
+
 - Engineering standards baseline: ESLint, Prettier, MODULE descriptor, structured logging standard, settings naming convention, Redis key convention, hierarchical CLAUDE.md files
 
 ---

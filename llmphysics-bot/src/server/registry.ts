@@ -4,7 +4,7 @@ import {
   initBotCore, logger,
   runOnPost, runOnComment,
   runQuotaCheck, runFloodOnModAction, runFloodOnPostDelete,
-  runLengthModerator, runLengthFlairUpdate,
+  runLengthModerator, runLengthFlairUpdate, runNonresponderCheck,
   runDepthCapModerator, runSelfResponseModerator,
   runOnPostReport, runOnCommentReport,
   registerAdversarialReviewer, registerMopTool,
@@ -24,7 +24,7 @@ initBotCore({
 
 // ─── Trigger arrays ───────────────────────────────────────────────────────────
 
-export const POST_SUBMIT    = [runOnPost, runQuotaCheck, runLengthModerator];
+export const POST_SUBMIT    = [runOnPost, runQuotaCheck, runLengthModerator, runNonresponderCheck];
 export const POST_FLAIR     = [runLengthFlairUpdate];
 export const COMMENT_CREATE = [runOnComment, runDepthCapModerator, runSelfResponseModerator];
 export const POST_REPORT    = [runOnPostReport];
