@@ -22,5 +22,3 @@ export { register as registerAdversarialReviewer } from './action-modules/advers
 export { register as registerMopTool } from './action-modules/mop-tool';
 export { register as registerResponseTool } from './action-modules/response-tool';
 export { register as registerQuotaViewer } from './action-modules/quota-viewer';
-
-export { run as runNonresponderCheck } from './trigger-modules/nonresponder-check';

@@ -317,6 +317,54 @@
         "label": "Define Command — Search grounding",
         "helpText": "Enable Google Search grounding for the !define command.",
         "defaultValue": true
+      },
+      "nonresponderModEnabled": {
+        "type": "boolean",
+        "label": "Nonresponder Check — Enable",
+        "helpText": "Enable or disable the nonresponder check (runs on post submit).",
+        "defaultValue": true
+      },
+      "nonresponderPostsToCheck": {
+        "type": "number",
+        "label": "Nonresponder Check — Previous posts to check",
+        "helpText": "Number of qualifying previous posts that must all lack an OP reply to another eligible user (1–10). Scans at most 10 candidate trees. Default: 2.",
+        "defaultValue": 2
+      },
+      "nonresponderMinComments": {
+        "type": "number",
+        "label": "Nonresponder Check — Minimum comments per post",
+        "helpText": "Minimum comments from other users, excluding OP, the app account, missing/deleted authors, removed/deleted/spam comments, and (by default) locked comments (1–100). Default: 3.",
+        "defaultValue": 3
+      },
+      "nonresponderSkipLockedComments": {
+        "type": "boolean",
+        "label": "Nonresponder Check — Skip locked comments",
+        "helpText": "Locked comments (e.g. AutoModerator, mod notices, bots/apps) do not count toward minimum other-user comments, and OP replies to locked comments do not count as responses. Unlocked mod comments count normally. A lock on OP’s own reply does not affect engagement.",
+        "defaultValue": true
+      },
+      "nonresponderRunOnMods": {
+        "type": "boolean",
+        "label": "Nonresponder Check — Run on moderators",
+        "helpText": "If off, moderator posts are not checked. For moderators, this setting takes precedence over Run on approved users.",
+        "defaultValue": false
+      },
+      "nonresponderRunOnApprovedUsers": {
+        "type": "boolean",
+        "label": "Nonresponder Check — Run on approved users",
+        "helpText": "If off, approved users’ posts are not checked, except moderators when Run on moderators is on.",
+        "defaultValue": true
+      },
+      "nonresponderReportRepeat": {
+        "type": "boolean",
+        "label": "Nonresponder Check — Report repeat nonresponders",
+        "helpText": "Reports the new post to moderators after warning when every qualifying previous post also received an app warning.",
+        "defaultValue": true
+      },
+      "nonresponderResponse": {
+        "type": "paragraph",
+        "label": "Nonresponder Check — Warning comment",
+        "helpText": "Commented (distinguished, stickied, locked) on the new post when the author is a nonresponder. Leave blank to post nothing.",
+        "defaultValue": "Responding to commenters is a subreddit rule. You did not respond on your recent qualifying posts. Please engage with the comments on this post by replying to commenters."
       }
     }
   },

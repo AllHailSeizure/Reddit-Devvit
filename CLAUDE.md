@@ -165,7 +165,7 @@ Work on `develop`. Stage verified files onto `publish-bot` or `publish-bingo`. M
 
 All bot module logic lives in `packages/bot-core/src/`:
 - `helpers/` — log, settings, redis, paper-fetch, command parsing
-- `trigger-modules/` — depth-cap, flood, length, report, self-response, nonresponder-check (6 modules)
+- `trigger-modules/` — depth-cap, flood, length, report, self-response (5 modules)
 - `action-modules/` — adversarial-reviewer, mop-tool, response-tool, quota-viewer (4 modules)
 - `command-modules/` — define-command (side-effect import at startup)
 - `admin.ts` — settings UI for mods

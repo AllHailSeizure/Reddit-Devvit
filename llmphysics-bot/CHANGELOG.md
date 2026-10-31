@@ -6,8 +6,6 @@ All notable changes to llmphysics-bot. Format: `module(<scope>): description`.
 
 ## [Unreleased]
 
-- `module(nonresponder-check)`: Warn nonresponding authors on post submit after the latest 2 qualifying posts with 3+ surviving other-user comments and no OP responses. Exclude OP, app authors, missing/deleted authors, and removed/deleted/spam comments. `nonresponderSkipLockedComments` (true) excludes locked comments and replies to locked parents; locking OP’s reply does not invalidate it. Unlocked mod comments count normally. `nonresponderRunOnMods` (false) takes precedence over `nonresponderRunOnApprovedUsers` (true). Skip app/configured-bot posters; other bots/apps are checked normally with no username list. Bounded scans, duplicate protection, configurable warning, and repeat reporting (`nonresponderReportRepeat=true`; warnings tracked for 180 days with comment fallback).
-
 - Engineering standards baseline: ESLint, Prettier, MODULE descriptor, structured logging standard, settings naming convention, Redis key convention, hierarchical CLAUDE.md files
 
 ---

@@ -1,6 +1,5 @@
 import { reddit, redis, settings } from '@devvit/web/server';
 import type { OnPostSubmitRequest } from '@devvit/web/shared';
-import { getBotConfig } from '../config';
 import { logger, logZSet } from '../helpers/log-helper';
 import { formatSignature } from '../helpers/settings-helper';
 import type { PostId } from '../types';
@@ -51,10 +50,9 @@ export async function run(event: OnPostSubmitRequest): Promise<void> {
     const { post, author, subreddit } = event;
     if (!post?.id || !author?.name || !author.id || !subreddit?.name
       || author.name.toLowerCase() === '[deleted]') return;
-    const config = getBotConfig();
     const appUser = await reddit.getAppUser();
     if (!appUser?.username) return; // Cannot safely identify app comments without its account.
-    const appAuthors = new Set([config.botUsername, appUser.username].map(n => n.toLowerCase()));
+    const appAuthors = new Set([appUser.username.toLowerCase()]);
     if (appAuthors.has(author.name.toLowerCase())) return;
 
     const [skipLocked, runOnMods, runOnApprovedUsers, rawPosts, rawComments, warning, signature, reportRepeat] = await Promise.all([

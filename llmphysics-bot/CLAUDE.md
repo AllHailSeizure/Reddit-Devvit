@@ -16,7 +16,7 @@ Playtest URL (re-add manually when a post opens in a new tab):
 https://www.reddit.com/r/llmphysics_dev/?playtest=llmphysics-bot
 ```
 
-Bot-core nonresponder decision tests run locally with `npm test -w @llmphysics/bot-core`. Reddit API behavior is validated manually during playtest.
+There is no test runner. Validation is done manually via `devvit logs` during playtest.
 
 ---
 
@@ -254,12 +254,3 @@ All levels write to console (visible via `devvit logs`). Each level is also pers
 
 **NEVER auto-bump the version to work around deployment errors.** If `devvit playtest` fails with "AppVersion already exists," ask first before changing `package.json` version. The issue is usually environmental (lingering process, platform state) and will resolve itself or needs manual investigation — not a version bump band-aid.
 
-## Nonresponder Check
-
-Shared module: `packages/bot-core/src/trigger-modules/nonresponder-check.ts`, exported as `runNonresponderCheck` and registered in `POST_SUBMIT`. Keep camelCase platform settings in `devvit.json`, read via `settings.get`: `nonresponderModEnabled`, `nonresponderPostsToCheck` (2), `nonresponderMinComments` (3 other-user comments), `nonresponderReportRepeat` (true), `nonresponderSkipLockedComments` (true), `nonresponderRunOnMods` (false), `nonresponderRunOnApprovedUsers` (true), and `nonresponderResponse`. Do not add these to the legacy Redis settings menu.
-
-Moderators are exempt by default (`nonresponderRunOnMods=false`); approved users are checked by default (`nonresponderRunOnApprovedUsers=true`). For a moderator who is also approved, the moderator setting wins. Always skip missing/deleted posters and the app's own account/configured bot username; those two app authors are also excluded from other-user counts, reply parents, and used for warning detection. Other bots/apps are checked like anyone else, with exemptions only through moderator/approved status; there is no username list. Do not use `config.botAuthors` here.
-
-With `nonresponderSkipLockedComments=true` (default), locked comments (including AutoModerator, mod notices, or bots/apps) do not count toward the minimum, and OP replies to locked parents do not count as responses. Unlocked moderator comments count normally. A lock on OP's own reply does not matter: it counts if the reply survives and its parent is eligible. Turning this off lets locked comments and replies to them count, except app authors remain excluded.
-
-Fetch each candidate tree once; pure decisions count surviving eligible-user comments excluding OP and app accounts, and surviving OP replies to other eligible users. Removed parents count if their author is known; unknown/deleted authors do not. Scan 50 history posts, at most 10 candidate trees, 500 comments/50 listings per tree; incomplete scans mean no action. Warn on every qualifying new post. If all checked posts were warned, report the new post after warning via `reddit.report`; failures are logged. Redis: `bot:nrmod:handled:{postId}` (7 days), `bot:nrmod:warned:{postId}` (warning ID, 180 days), `bot:nrmod:log` (includes escalation requested/succeeded). Fallback uses distinguished app/bot comments starting with the current warning text; changed text may miss expired/untracked warnings. See README for details.

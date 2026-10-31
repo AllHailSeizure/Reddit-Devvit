@@ -16,6 +16,20 @@ There are two ways to interact with it:
 
 ## Automatic Rules
 
+### Responding to Commenters (Nonresponder Check)
+
+When someone posts, the bot checks their latest 2 qualifying previous posts here. Each needs 3 comments from other known users, excluding OP, the app account, and removed/deleted/spam comments. Only surviving OP replies to another eligible user count as engagement; top-level comments and replies to self/app accounts do not. A since-removed parent counts if its author is known; unknown/deleted parent authors do not. Without engagement on either post, the bot leaves a stickied, distinguished, locked reminder. The post stays open and warnings have no repeat limit.
+
+If every checked qualifying post was already warned, the new post is also reported to mods as “Nonresponder: repeated warnings ignored”. Warning IDs are tracked for 180 days; older warnings can be recognized by distinguished app comments starting with the current warning text. Editing the warning text can prevent this fallback. Report failures are logged.
+
+Moderators are exempt by default (`nonresponderRunOnMods=false`); approved users are checked by default (`nonresponderRunOnApprovedUsers=true`). For a moderator who is also approved, the moderator setting wins. Always skip missing/deleted posters and the app's own account; it is also excluded from other-user counts, reply parents, and used for warning detection. Other bots/apps are checked like anyone else, with exemptions only through moderator/approved status; there is no username list.
+
+With `nonresponderSkipLockedComments=true` (default), locked comments (including AutoModerator, mod notices, or bots/apps) do not count toward the minimum, and OP replies to locked parents do not count as responses. Unlocked moderator comments count normally. A lock on OP's own reply does not matter: it counts if the reply survives and its parent is eligible. Turning this off lets locked comments and replies to them count, except app authors remain excluded.
+
+The check scans the author's 50 most recent posts and at most 10 candidate trees (500 comments/50 listings each). Insufficient history or incomplete scans mean no warning. Installation defaults: `nonresponderModEnabled=true`, `nonresponderPostsToCheck=2`, `nonresponderMinComments=3`, `nonresponderReportRepeat=true`, plus the settings above and `nonresponderResponse` (rule reminder). Blank warning text suppresses posting and reporting.
+
+---
+
 ### Posting Quota (Flood Moderator)
 
 The bot limits how often a user can post. By default, a user can post once every 24 hours. If someone posts more than that, their extra post is automatically removed.
