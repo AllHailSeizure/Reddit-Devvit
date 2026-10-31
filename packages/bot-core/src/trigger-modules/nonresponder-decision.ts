@@ -1,3 +1,11 @@
+export const DEFAULT_IGNORED_USERS = 'tap-the-sign, moderator-toolbox, adversarial-review, automoderator';
+
+export function parseIgnoredUsers(raw: string): Set<string> {
+  return new Set(raw.split(/[,\s]+/)
+    .map(name => name.trim().replace(/^\/?u\//i, '').toLowerCase())
+    .filter(Boolean));
+}
+
 export interface PreviousPost {
   id: string;
   subredditName: string;
@@ -43,25 +51,25 @@ export interface CommentRecord {
   distinguished: boolean;
 }
 
-function knownHuman(name: string, op: string, bots: ReadonlySet<string>): boolean {
+function knownHuman(name: string, op: string, excludedAuthors: ReadonlySet<string>): boolean {
   const normalized = name.toLowerCase();
   return !!normalized && normalized !== '[deleted]' && normalized !== '[removed]'
-    && normalized !== op.toLowerCase() && !bots.has(normalized);
+    && normalized !== op.toLowerCase() && !excludedAuthors.has(normalized);
 }
 
-export function countOtherUserComments(comments: CommentRecord[], op: string, bots: ReadonlySet<string>): number {
-  return comments.filter(c => knownHuman(c.authorName, op, bots)
+export function countOtherUserComments(comments: CommentRecord[], op: string, excludedAuthors: ReadonlySet<string>): number {
+  return comments.filter(c => knownHuman(c.authorName, op, excludedAuthors)
     && !c.removed && !c.deleted && !c.spam).length;
 }
 
-export function countResponses(comments: CommentRecord[], op: string, bots: ReadonlySet<string>): number {
+export function countResponses(comments: CommentRecord[], op: string, excludedAuthors: ReadonlySet<string>): number {
   const byId = new Map(comments.map(c => [c.id, c]));
   return comments.filter(c => {
     if (c.authorName.toLowerCase() !== op.toLowerCase() || c.removed || c.deleted || c.spam
       || !c.parentId.startsWith('t1_')) return false;
     const parent = byId.get(c.parentId);
     // A since-removed parent still establishes engagement if its author is known.
-    return !!parent && knownHuman(parent.authorName, op, bots);
+    return !!parent && knownHuman(parent.authorName, op, excludedAuthors);
   }).length;
 }
 

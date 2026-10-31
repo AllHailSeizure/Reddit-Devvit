@@ -4,7 +4,7 @@ import { getBotConfig } from '../config';
 import { logger, logZSet } from '../helpers/log-helper';
 import { formatSignature } from '../helpers/settings-helper';
 import type { PostId } from '../types';
-import { boundedThreshold, countOtherUserComments, countResponses, DEFAULT_WARNING, isNonresponder, qualifyingPosts, shouldReportRepeat, wasWarned, type CommentRecord } from './nonresponder-decision';
+import { boundedThreshold, countOtherUserComments, countResponses, DEFAULT_IGNORED_USERS, DEFAULT_WARNING, parseIgnoredUsers, isNonresponder, qualifyingPosts, shouldReportRepeat, wasWarned, type CommentRecord } from './nonresponder-decision';
 
 export const MODULE = {
   name: 'nonresponder-check',
@@ -13,7 +13,7 @@ export const MODULE = {
   triggers: ['onPostSubmit'],
   redisKeys: ['bot:nrmod:handled:{postId}', 'bot:nrmod:warned:{postId}', 'bot:nrmod:log'],
   settings: ['nonresponderModEnabled', 'nonresponderPostsToCheck',
-    'nonresponderMinComments', 'nonresponderIgnoreModerators',
+    'nonresponderMinComments', 'nonresponderIgnoredUsers',
     'nonresponderIgnoreContributors', 'nonresponderResponse', 'nonresponderReportRepeat', 'botSignature'],
 } as const;
 const log = logger(MODULE.name);
@@ -55,11 +55,10 @@ export async function run(event: OnPostSubmitRequest): Promise<void> {
     const appUser = await reddit.getAppUser();
     if (!appUser?.username) return; // Cannot safely identify app comments without its account.
     const appAuthors = new Set([config.botUsername, appUser.username].map(n => n.toLowerCase()));
-    const bots = new Set([...config.botAuthors, ...appAuthors, 'AutoModerator'].map(n => n.toLowerCase()));
-    if (bots.has(author.name.toLowerCase())) return;
+    if (appAuthors.has(author.name.toLowerCase())) return;
 
-    const [ignoreMods, ignoreApproved, rawPosts, rawComments, warning, signature, reportRepeat] = await Promise.all([
-      settings.get<boolean>('nonresponderIgnoreModerators'),
+    const [rawIgnoredUsers, ignoreApproved, rawPosts, rawComments, warning, signature, reportRepeat] = await Promise.all([
+      settings.get<string>('nonresponderIgnoredUsers'),
       settings.get<boolean>('nonresponderIgnoreContributors'),
       settings.get<number>('nonresponderPostsToCheck'),
       settings.get<number>('nonresponderMinComments'),
@@ -67,8 +66,10 @@ export async function run(event: OnPostSubmitRequest): Promise<void> {
       settings.get<string>('botSignature'),
       settings.get<boolean>('nonresponderReportRepeat'),
     ]);
+    const ignoredUsers = parseIgnoredUsers(rawIgnoredUsers ?? DEFAULT_IGNORED_USERS);
+    if (ignoredUsers.has(author.name.toLowerCase())) return;
+    const excludedAuthors = new Set([...ignoredUsers, ...appAuthors]);
     const lookup = { subredditName: subreddit.name, username: author.name };
-    if ((ignoreMods ?? true) && (await reddit.getModerators(lookup).all()).length) return;
     if ((ignoreApproved ?? true) && (await reddit.getApprovedUsers(lookup).all()).length) return;
     const postsToCheck = boundedThreshold(rawPosts ?? 2, 2, 10);
     const minComments = boundedThreshold(rawComments ?? 3, 3, 100);
@@ -83,9 +84,9 @@ export async function run(event: OnPostSubmitRequest): Promise<void> {
     if (!text) return;
     for (const candidate of candidates) {
       const comments = await fetchComments(candidate.id);
-      if (countOtherUserComments(comments, author.name, bots) < minComments) continue;
+      if (countOtherUserComments(comments, author.name, excludedAuthors) < minComments) continue;
       previous.push(candidate);
-      responses.push(countResponses(comments, author.name, bots));
+      responses.push(countResponses(comments, author.name, excludedAuthors));
       if (responses[responses.length - 1] > 0) return;
       warned.push(wasWarned(comments, await redis.get(`bot:nrmod:warned:${candidate.id}`), text, appAuthors));
       if (previous.length === postsToCheck) break;

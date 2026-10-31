@@ -351,14 +351,14 @@
       "nonresponderMinComments": {
         "type": "number",
         "label": "Nonresponder Check — Minimum comments per post",
-        "helpText": "Minimum comments from other users, excluding OP, bots, removed, deleted, and spam comments (1–100). Default: 3.",
+        "helpText": "Minimum comments from other users, excluding OP, ignored users, app accounts, removed, deleted, and spam comments (1–100). Default: 3.",
         "defaultValue": 3
       },
-      "nonresponderIgnoreModerators": {
-        "type": "boolean",
-        "label": "Nonresponder Check — Ignore moderators",
-        "helpText": "If enabled, the nonresponder check will not apply to moderators.",
-        "defaultValue": true
+      "nonresponderIgnoredUsers": {
+        "type": "paragraph",
+        "label": "Nonresponder Check — Ignored users",
+        "helpText": "Comma- or newline-separated usernames (whitespace also accepted), case-insensitive, with optional u/ or /u/ prefix. Skips these posters and excludes their comments and replies to them from participation checks. Leave blank for no ignored users; app accounts are always excluded.",
+        "defaultValue": "tap-the-sign, moderator-toolbox, adversarial-review, automoderator"
       },
       "nonresponderIgnoreContributors": {
         "type": "boolean",

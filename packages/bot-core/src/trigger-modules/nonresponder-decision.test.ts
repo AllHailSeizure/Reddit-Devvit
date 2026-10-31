@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { boundedThreshold, countOtherUserComments, countResponses, isNonresponder, qualifyingPosts, shouldReportRepeat, wasWarned, type CommentRecord } from './nonresponder-decision';
+import { boundedThreshold, countOtherUserComments, countResponses, isNonresponder, parseIgnoredUsers, qualifyingPosts, shouldReportRepeat, wasWarned, type CommentRecord } from './nonresponder-decision';
 
 const post = (id: string, day: number, extra = {}) => ({
   id, createdAt: new Date(2026, 0, day), subredditName: 'Example',
@@ -32,7 +32,9 @@ describe('nonresponder decision', () => {
   });
 });
 
-const bots = new Set(['bot', 'automoderator', 'app']);
+const ignoredUsers = parseIgnoredUsers('bot, automoderator');
+const appAuthors = new Set(['app', 'configured-app']);
+const excludedAuthors = new Set([...ignoredUsers, ...appAuthors]);
 const comment = (id: string, authorName: string, parentId = 't3_post', extra = {}): CommentRecord => ({
   id, authorName, parentId, removed: false, deleted: false, spam: false,
   body: 'hello', distinguished: false, ...extra,
@@ -43,12 +45,13 @@ describe('comment tree decisions', () => {
     const comments = [comment('1', 'Alice'), comment('2', 'BOT'), comment('3', 'AutoModerator'),
       comment('4', 'APP'), comment('5', 'bob', undefined, { removed: true }),
       comment('6', 'bob', undefined, { deleted: true }), comment('7', 'bob', undefined, { spam: true }),
-      comment('8', '[deleted]'), comment('9', ''), comment('10', 'bob'), comment('11', 'carol')];
-    expect(countOtherUserComments(comments, 'alice', bots)).toBe(2);
+      comment('8', '[deleted]'), comment('9', ''), comment('10', 'bob'), comment('11', 'carol'), comment('12', 'CONFIGURED-APP')];
+    expect(countOtherUserComments(comments, 'alice', excludedAuthors)).toBe(2);
   });
   it.each([
     ['top-level', 't3_post', {}, 0], ['self reply', 't1_self', {}, 0],
-    ['bot reply', 't1_bot', {}, 0], ['human reply', 't1_human', {}, 1],
+    ['ignored user reply', 't1_bot', {}, 0], ['app reply', 't1_app', {}, 0],
+    ['configured app reply', 't1_configured', {}, 0], ['human reply', 't1_human', {}, 1],
     ['removed reply', 't1_human', { removed: true }, 0],
     ['deleted reply', 't1_human', { deleted: true }, 0],
     ['spam reply', 't1_human', { spam: true }, 0],
@@ -56,17 +59,18 @@ describe('comment tree decisions', () => {
     ['removed parent', 't1_removed', {}, 1], ['deep reply', 't1_deep', {}, 1],
   ])('%s', (_label, parentId, extra, expected) => {
     const comments = [comment('t1_self', 'alice'), comment('t1_bot', 'BOT'),
+      comment('t1_app', 'APP'), comment('t1_configured', 'CONFIGURED-APP'),
       comment('t1_human', 'bob'), comment('t1_deleted', '[deleted]'),
       comment('t1_removed', 'bob', undefined, { removed: true, deleted: true }),
       comment('t1_deep', 'carol', 't1_human'), comment('t1_reply', 'ALICE', parentId, extra)];
-    expect(countResponses(comments, 'alice', bots)).toBe(expected);
+    expect(countResponses(comments, 'alice', excludedAuthors)).toBe(expected);
   });
   it('continues past candidates with insufficient human comments and bounds candidates', () => {
     const candidates = qualifyingPosts([post('old', 1), post('quiet', 8), post('recent', 9)],
       'new', 'Example', new Date(2026, 0, 10), 10, 3);
     const trees = { recent: [comment('1', 'bob'), comment('2', 'carol'), comment('3', 'dan')],
       quiet: [comment('1', 'bot')], old: [comment('1', 'bob'), comment('2', 'carol'), comment('3', 'dan')] };
-    expect(candidates.filter(p => countOtherUserComments(trees[p.id as keyof typeof trees], 'alice', bots) >= 3)
+    expect(candidates.filter(p => countOtherUserComments(trees[p.id as keyof typeof trees], 'alice', excludedAuthors) >= 3)
       .slice(0, 2).map(p => p.id)).toEqual(['recent', 'old']);
     expect(qualifyingPosts(Array.from({ length: 15 }, (_, i) => post(String(i), i + 1)),
       'new', 'example', new Date(2026, 1, 1), 10, 3)).toHaveLength(10);
@@ -85,5 +89,24 @@ describe('comment tree decisions', () => {
     expect(wasWarned([warning], undefined, 'changed', new Set(['app']))).toBe(false);
     expect(wasWarned([warning], undefined, 'warning', new Set(['bot']))).toBe(false);
     expect(wasWarned([warning], undefined, '', new Set(['app']))).toBe(false);
+  });
+});
+
+describe('parseIgnoredUsers', () => {
+  it.each([
+    ['Alice,bob,Carol', ['alice', 'bob', 'carol']],
+    ['Alice\nbob\r\nCarol\tdan eve', ['alice', 'bob', 'carol', 'dan', 'eve']],
+    ['u/Alice, /U/BOB, U/Carol, /u/Dan', ['alice', 'bob', 'carol', 'dan']],
+    [' , Alice, alice\n /u/ALICE, u/, /U/,  bob  ', ['alice', 'bob']],
+    ['', []],
+    ['  , \n\t', []],
+  ])('parses %j', (raw, expected) => {
+    expect([...parseIgnoredUsers(raw)]).toEqual(expected);
+  });
+  it('allows users omitted from an empty list to count', () => {
+    const excluded = new Set([...parseIgnoredUsers(''), ...appAuthors]);
+    const comments = [comment('t1_parent', 'AutoModerator'), comment('t1_reply', 'alice', 't1_parent')];
+    expect(countOtherUserComments(comments, 'alice', excluded)).toBe(1);
+    expect(countResponses(comments, 'alice', excluded)).toBe(1);
   });
 });
