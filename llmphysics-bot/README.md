@@ -133,9 +133,13 @@ In the Devvit app settings panel (accessible via the subreddit's app settings), 
 
 ### Nonresponder Check
 
-On post submit, checks the author's latest 2 qualifying previous posts in this subreddit, within their 50 most recent posts across Reddit. Each must have at least 3 comments according to Reddit's total `numberOfComments` (including OP, bots, and removed comments). Removed, spam, and deleted posts are skipped. If neither post contains a surviving OP comment at any reply depth, the app posts a distinguished, stickied, locked warning on the new post, with `botSignature`. The post stays open.
+On post submit, checks the author's latest 2 qualifying previous posts here, within their 50 most recent posts across Reddit. Each needs at least 3 surviving comments from other known users: OP, configured bots, the configured bot username, AutoModerator, the app account, missing/deleted authors, and removed/deleted/spam comments are excluded. Reddit's total comment count is only a cheap pre-filter. Removed, spam, and deleted posts are skipped; at most 10 candidate trees are fetched newest-first to find enough qualifying posts.
 
-Bots in deployment config, AutoModerator, and the app itself are exempt. Moderators and approved submitters are exempt by default. Missing authors, insufficient history, API failures, and incomplete comment scans produce no warning. Each tree is limited to 500 comments and 50 listings; hitting either limit skips enforcement. A seven-day atomic Redis claim prevents duplicate warning submissions within that window.
+An OP response must be a surviving, non-spam reply to another known human's comment, at any depth. Top-level OP comments and replies to self or bots do not count. A removed/deleted parent still counts if its human author is known; missing parents and unknown/deleted parent authors do not. If no qualifying post has an OP response, the app posts a distinguished, stickied, locked warning on the new post with `botSignature`. Warnings have no repeat limit; the post stays open.
+
+When every checked qualifying post was also warned, the app additionally reports the new post to moderators after posting its warning, with reason “Nonresponder: repeated warnings ignored”. `nonresponderReportRepeat` can disable reporting. Warning comment IDs are stored in `bot:nrmod:warned:{postId}` for 180 days. Without a tracking key, a distinguished comment by the configured bot or app account starting with the current warning text counts as a previous warning. Changing that text or losing/removing older comments can prevent fallback detection after expiry. Report failures are logged; `bot:nrmod:log` records whether escalation was requested and reporting succeeded.
+
+Bots are exempt. Moderators and approved submitters are exempt by default. Missing authors/app identity, insufficient history, API failures, and incomplete comment scans produce no warning. Each tree is limited to 500 comments and 50 listings; hitting either limit skips enforcement. A seven-day atomic Redis claim prevents duplicate warning submissions within that window.
 
 Settings are in the app installation settings (`devvit.json` → `settings.subreddit`):
 
@@ -143,12 +147,13 @@ Settings are in the app installation settings (`devvit.json` → `settings.subre
 |-----|---------|
 | `nonresponderModEnabled` | `true` |
 | `nonresponderPostsToCheck` | `2` (1–10) |
-| `nonresponderMinComments` | `3` (1–100) |
+| `nonresponderMinComments` | `3` (1–100), other-user comments only |
+| `nonresponderReportRepeat` | `true` |
 | `nonresponderIgnoreModerators` | `true` |
 | `nonresponderIgnoreContributors` | `true` |
 | `nonresponderResponse` | Responding to commenters is a subreddit rule. You did not respond on your recent qualifying posts. Please engage with the comments on this post by replying to commenters. |
 
-Invalid numeric thresholds use defaults. A blank warning suppresses posting. Live testing should verify nested replies, removed/deleted comments, exemption settings, duplicate delivery, and warning locking/stickying. Local decision tests: `npm test -w @llmphysics/bot-core`.
+Invalid numeric thresholds use defaults. A blank warning suppresses posting. Live testing should verify nested replies, removed/deleted comments, exemption settings, duplicate delivery, warning locking/stickying, report delivery, and warning tracking/fallback. Local decision tests: `npm test -w @llmphysics/bot-core`.
 
 ### Flood Moderator
 

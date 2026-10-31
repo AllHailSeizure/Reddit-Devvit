@@ -345,13 +345,13 @@
       "nonresponderPostsToCheck": {
         "type": "number",
         "label": "Nonresponder Check — Previous posts to check",
-        "helpText": "Number of qualifying previous posts that must all lack an OP reply (1–10). Default: 2.",
+        "helpText": "Number of qualifying previous posts that must all lack an OP reply to another human (1–10). Scans at most 10 candidate trees. Default: 2.",
         "defaultValue": 2
       },
       "nonresponderMinComments": {
         "type": "number",
         "label": "Nonresponder Check — Minimum comments per post",
-        "helpText": "A previous post only counts if it has at least this many comments (1–100). Default: 3.",
+        "helpText": "Minimum comments from other users, excluding OP, bots, removed, deleted, and spam comments (1–100). Default: 3.",
         "defaultValue": 3
       },
       "nonresponderIgnoreModerators": {
@@ -364,6 +364,12 @@
         "type": "boolean",
         "label": "Nonresponder Check — Ignore approved users",
         "helpText": "If enabled, the nonresponder check will not apply to approved users.",
+        "defaultValue": true
+      },
+      "nonresponderReportRepeat": {
+        "type": "boolean",
+        "label": "Nonresponder Check — Report repeat nonresponders",
+        "helpText": "Reports the new post to moderators after warning when every qualifying previous post also received an app warning.",
         "defaultValue": true
       },
       "nonresponderResponse": {

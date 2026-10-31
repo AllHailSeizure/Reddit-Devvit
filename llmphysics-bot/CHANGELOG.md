@@ -6,7 +6,7 @@ All notable changes to llmphysics-bot. Format: `module(<scope>): description`.
 
 ## [Unreleased]
 
-- `module(nonresponder-check)`: Warn nonresponding authors on post submit; configurable history/comment thresholds (2/3), exemptions, warning text, bounded scans, and duplicate protection.
+- `module(nonresponder-check)`: Warn nonresponding authors on post submit. A previous post qualifies with 3+ comments from other users (excluding OP, bots, removed/deleted/spam); only OP replies to another human's comment count as responses. Checks the latest 2 qualifying posts (bounded scans, duplicate protection, exemptions, configurable warning). If those posts were also warned, reports the new post to mods (`nonresponderReportRepeat`, default true; warnings tracked in Redis for 180 days with a comment-scan fallback).
 
 - Engineering standards baseline: ESLint, Prettier, MODULE descriptor, structured logging standard, settings naming convention, Redis key convention, hierarchical CLAUDE.md files
 

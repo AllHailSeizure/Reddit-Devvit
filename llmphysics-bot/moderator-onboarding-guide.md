@@ -18,9 +18,11 @@ There are two ways to interact with it:
 
 ### Responding to Commenters (Nonresponder Check)
 
-When someone posts, the bot checks their last 2 qualifying previous posts here. Each needs at least 3 total Reddit comments, including bot and OP comments. If the author left no surviving comments on either post, the bot leaves a stickied, distinguished, locked reminder on the new post. The post stays open for discussion.
+When someone posts, the bot checks their latest 2 qualifying previous posts here. Each needs 3 comments from other known users, excluding OP, configured bots, AutoModerator, the app account, and removed/deleted/spam comments. Only surviving OP replies to another known human count as engagement; top-level comments and replies to self/bots do not. A since-removed parent counts if its author is known; unknown/deleted parent authors do not. Without engagement on either post, the bot leaves a stickied, distinguished, locked reminder. The post stays open and warnings have no repeat limit.
 
-Moderators, approved submitters, and configured bots are exempt by default. The check scans only the author's 50 most recent posts; insufficient history or an incomplete comment scan means no warning. In the app installation settings, use `nonresponderModEnabled` (default true), `nonresponderPostsToCheck` (2), `nonresponderMinComments` (3), `nonresponderIgnoreModerators` (true), `nonresponderIgnoreContributors` (true), and `nonresponderResponse` (the rule reminder). Blank warning text suppresses posting.
+If every checked qualifying post was already warned, the new post is also reported to mods as “Nonresponder: repeated warnings ignored”. Warning IDs are tracked for 180 days; older warnings can be recognized by distinguished app/bot comments starting with the current warning text. Editing the warning text can prevent this fallback. Report failures are logged.
+
+Moderators, approved submitters, and configured bots are exempt by default. The check considers the author's 50 most recent posts and fetches at most 10 candidate trees (500 comments/50 listings each); insufficient history or incomplete scans mean no warning. Installation settings: `nonresponderModEnabled` (true), `nonresponderPostsToCheck` (2), `nonresponderMinComments` (3 other-user comments), `nonresponderReportRepeat` (true), `nonresponderIgnoreModerators` (true), `nonresponderIgnoreContributors` (true), and `nonresponderResponse` (rule reminder). Blank warning text suppresses posting and reporting.
 
 ---
 
