@@ -4,7 +4,7 @@ import { getBotConfig } from '../config';
 import { logger, logZSet } from '../helpers/log-helper';
 import { formatSignature } from '../helpers/settings-helper';
 import type { PostId } from '../types';
-import { boundedThreshold, countOtherUserComments, countResponses, DEFAULT_IGNORED_USERS, DEFAULT_WARNING, parseIgnoredUsers, isNonresponder, qualifyingPosts, shouldReportRepeat, wasWarned, type CommentRecord } from './nonresponder-decision';
+import { boundedThreshold, countOtherUserComments, countResponses, DEFAULT_WARNING, isNonresponder, qualifyingPosts, shouldCheckPoster, shouldReportRepeat, wasWarned, type CommentRecord } from './nonresponder-decision';
 
 export const MODULE = {
   name: 'nonresponder-check',
@@ -13,8 +13,8 @@ export const MODULE = {
   triggers: ['onPostSubmit'],
   redisKeys: ['bot:nrmod:handled:{postId}', 'bot:nrmod:warned:{postId}', 'bot:nrmod:log'],
   settings: ['nonresponderModEnabled', 'nonresponderPostsToCheck',
-    'nonresponderMinComments', 'nonresponderIgnoredUsers',
-    'nonresponderIgnoreContributors', 'nonresponderResponse', 'nonresponderReportRepeat', 'botSignature'],
+    'nonresponderMinComments', 'nonresponderSkipLockedComments',
+    'nonresponderRunOnMods', 'nonresponderRunOnApprovedUsers', 'nonresponderResponse', 'nonresponderReportRepeat', 'botSignature'],
 } as const;
 const log = logger(MODULE.name);
 
@@ -35,7 +35,7 @@ async function fetchComments(postId: PostId): Promise<CommentRecord[]> {
         id: comment.id, parentId: comment.parentId, authorName: comment.authorName,
         removed: comment.isRemoved() || comment.body === '[removed]',
         deleted: comment.body === '[deleted]' || comment.authorName.toLowerCase() === '[deleted]',
-        spam: comment.spam, body: comment.body, distinguished: !!comment.distinguishedBy,
+        locked: comment.locked, spam: comment.spam, body: comment.body, distinguished: !!comment.distinguishedBy,
       });
       pending.push(comment.replies);
     }
@@ -57,20 +57,24 @@ export async function run(event: OnPostSubmitRequest): Promise<void> {
     const appAuthors = new Set([config.botUsername, appUser.username].map(n => n.toLowerCase()));
     if (appAuthors.has(author.name.toLowerCase())) return;
 
-    const [rawIgnoredUsers, ignoreApproved, rawPosts, rawComments, warning, signature, reportRepeat] = await Promise.all([
-      settings.get<string>('nonresponderIgnoredUsers'),
-      settings.get<boolean>('nonresponderIgnoreContributors'),
+    const [skipLocked, runOnMods, runOnApprovedUsers, rawPosts, rawComments, warning, signature, reportRepeat] = await Promise.all([
+      settings.get<boolean>('nonresponderSkipLockedComments'),
+      settings.get<boolean>('nonresponderRunOnMods'),
+      settings.get<boolean>('nonresponderRunOnApprovedUsers'),
       settings.get<number>('nonresponderPostsToCheck'),
       settings.get<number>('nonresponderMinComments'),
       settings.get<string>('nonresponderResponse'),
       settings.get<string>('botSignature'),
       settings.get<boolean>('nonresponderReportRepeat'),
     ]);
-    const ignoredUsers = parseIgnoredUsers(rawIgnoredUsers ?? DEFAULT_IGNORED_USERS);
-    if (ignoredUsers.has(author.name.toLowerCase())) return;
-    const excludedAuthors = new Set([...ignoredUsers, ...appAuthors]);
     const lookup = { subredditName: subreddit.name, username: author.name };
-    if ((ignoreApproved ?? true) && (await reddit.getApprovedUsers(lookup).all()).length) return;
+    // When both groups run, neither status can exempt the poster.
+    const isMod = (!(runOnMods ?? false) || !(runOnApprovedUsers ?? true))
+      && (await reddit.getModerators(lookup).all()).length > 0;
+    const isApproved = !isMod && !(runOnApprovedUsers ?? true)
+      && (await reddit.getApprovedUsers(lookup).all()).length > 0;
+    if (!shouldCheckPoster({ isMod, isApproved,
+      runOnMods: runOnMods ?? false, runOnApprovedUsers: runOnApprovedUsers ?? true })) return;
     const postsToCheck = boundedThreshold(rawPosts ?? 2, 2, 10);
     const minComments = boundedThreshold(rawComments ?? 3, 3, 100);
     const current = await reddit.getPostById(post.id as PostId);
@@ -84,9 +88,9 @@ export async function run(event: OnPostSubmitRequest): Promise<void> {
     if (!text) return;
     for (const candidate of candidates) {
       const comments = await fetchComments(candidate.id);
-      if (countOtherUserComments(comments, author.name, excludedAuthors) < minComments) continue;
+      if (countOtherUserComments(comments, author.name, appAuthors, skipLocked ?? true) < minComments) continue;
       previous.push(candidate);
-      responses.push(countResponses(comments, author.name, excludedAuthors));
+      responses.push(countResponses(comments, author.name, appAuthors, skipLocked ?? true));
       if (responses[responses.length - 1] > 0) return;
       warned.push(wasWarned(comments, await redis.get(`bot:nrmod:warned:${candidate.id}`), text, appAuthors));
       if (previous.length === postsToCheck) break;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { boundedThreshold, countOtherUserComments, countResponses, isNonresponder, parseIgnoredUsers, qualifyingPosts, shouldReportRepeat, wasWarned, type CommentRecord } from './nonresponder-decision';
+import { boundedThreshold, countOtherUserComments, countResponses, isNonresponder, shouldCheckPoster, qualifyingPosts, shouldReportRepeat, wasWarned, type CommentRecord } from './nonresponder-decision';
 
 const post = (id: string, day: number, extra = {}) => ({
   id, createdAt: new Date(2026, 0, day), subredditName: 'Example',
@@ -32,25 +32,23 @@ describe('nonresponder decision', () => {
   });
 });
 
-const ignoredUsers = parseIgnoredUsers('bot, automoderator');
 const appAuthors = new Set(['app', 'configured-app']);
-const excludedAuthors = new Set([...ignoredUsers, ...appAuthors]);
 const comment = (id: string, authorName: string, parentId = 't3_post', extra = {}): CommentRecord => ({
-  id, authorName, parentId, removed: false, deleted: false, spam: false,
+  id, authorName, parentId, removed: false, deleted: false, spam: false, locked: false,
   body: 'hello', distinguished: false, ...extra,
 });
 
 describe('comment tree decisions', () => {
-  it('counts only surviving comments by other known humans, case insensitively', () => {
+  it('counts only surviving comments by other eligible users, case insensitively', () => {
     const comments = [comment('1', 'Alice'), comment('2', 'BOT'), comment('3', 'AutoModerator'),
       comment('4', 'APP'), comment('5', 'bob', undefined, { removed: true }),
       comment('6', 'bob', undefined, { deleted: true }), comment('7', 'bob', undefined, { spam: true }),
       comment('8', '[deleted]'), comment('9', ''), comment('10', 'bob'), comment('11', 'carol'), comment('12', 'CONFIGURED-APP')];
-    expect(countOtherUserComments(comments, 'alice', excludedAuthors)).toBe(2);
+    expect(countOtherUserComments(comments, 'alice', appAuthors)).toBe(4);
   });
   it.each([
     ['top-level', 't3_post', {}, 0], ['self reply', 't1_self', {}, 0],
-    ['ignored user reply', 't1_bot', {}, 0], ['app reply', 't1_app', {}, 0],
+    ['other bot reply', 't1_bot', {}, 1], ['app reply', 't1_app', {}, 0],
     ['configured app reply', 't1_configured', {}, 0], ['human reply', 't1_human', {}, 1],
     ['removed reply', 't1_human', { removed: true }, 0],
     ['deleted reply', 't1_human', { deleted: true }, 0],
@@ -63,14 +61,14 @@ describe('comment tree decisions', () => {
       comment('t1_human', 'bob'), comment('t1_deleted', '[deleted]'),
       comment('t1_removed', 'bob', undefined, { removed: true, deleted: true }),
       comment('t1_deep', 'carol', 't1_human'), comment('t1_reply', 'ALICE', parentId, extra)];
-    expect(countResponses(comments, 'alice', excludedAuthors)).toBe(expected);
+    expect(countResponses(comments, 'alice', appAuthors)).toBe(expected);
   });
   it('continues past candidates with insufficient human comments and bounds candidates', () => {
     const candidates = qualifyingPosts([post('old', 1), post('quiet', 8), post('recent', 9)],
       'new', 'Example', new Date(2026, 0, 10), 10, 3);
     const trees = { recent: [comment('1', 'bob'), comment('2', 'carol'), comment('3', 'dan')],
       quiet: [comment('1', 'bot')], old: [comment('1', 'bob'), comment('2', 'carol'), comment('3', 'dan')] };
-    expect(candidates.filter(p => countOtherUserComments(trees[p.id as keyof typeof trees], 'alice', excludedAuthors) >= 3)
+    expect(candidates.filter(p => countOtherUserComments(trees[p.id as keyof typeof trees], 'alice', appAuthors) >= 3)
       .slice(0, 2).map(p => p.id)).toEqual(['recent', 'old']);
     expect(qualifyingPosts(Array.from({ length: 15 }, (_, i) => post(String(i), i + 1)),
       'new', 'example', new Date(2026, 1, 1), 10, 3)).toHaveLength(10);
@@ -92,21 +90,39 @@ describe('comment tree decisions', () => {
   });
 });
 
-describe('parseIgnoredUsers', () => {
-  it.each([
-    ['Alice,bob,Carol', ['alice', 'bob', 'carol']],
-    ['Alice\nbob\r\nCarol\tdan eve', ['alice', 'bob', 'carol', 'dan', 'eve']],
-    ['u/Alice, /U/BOB, U/Carol, /u/Dan', ['alice', 'bob', 'carol', 'dan']],
-    [' , Alice, alice\n /u/ALICE, u/, /U/,  bob  ', ['alice', 'bob']],
-    ['', []],
-    ['  , \n\t', []],
-  ])('parses %j', (raw, expected) => {
-    expect([...parseIgnoredUsers(raw)]).toEqual(expected);
+describe('poster exemptions', () => {
+  it('checks all status/setting combinations, including moderator precedence', () => {
+    for (const isMod of [false, true]) {
+      for (const isApproved of [false, true]) {
+        for (const runOnMods of [false, true]) {
+          for (const runOnApprovedUsers of [false, true]) {
+            const expected = isMod ? runOnMods : isApproved ? runOnApprovedUsers : true;
+            expect(shouldCheckPoster({ isMod, isApproved, runOnMods, runOnApprovedUsers })).toBe(expected);
+          }
+        }
+      }
+    }
   });
-  it('allows users omitted from an empty list to count', () => {
-    const excluded = new Set([...parseIgnoredUsers(''), ...appAuthors]);
-    const comments = [comment('t1_parent', 'AutoModerator'), comment('t1_reply', 'alice', 't1_parent')];
-    expect(countOtherUserComments(comments, 'alice', excluded)).toBe(1);
-    expect(countResponses(comments, 'alice', excluded)).toBe(1);
+});
+
+describe('locked comments', () => {
+  it.each([true, false])('filters counts and reply parents with skipLocked=%s', skipLocked => {
+    const comments = [comment('t1_parent', 'AutoModerator', undefined, { locked: true }),
+      comment('t1_mod', 'moderator', undefined, { distinguished: true }),
+      comment('t1_reply', 'alice', 't1_parent')];
+    expect(countOtherUserComments(comments, 'alice', appAuthors, skipLocked)).toBe(skipLocked ? 1 : 2);
+    expect(countResponses(comments, 'alice', appAuthors, skipLocked)).toBe(skipLocked ? 0 : 1);
+  });
+  it.each([true, false])('counts a locked OP reply to an unlocked parent with skipLocked=%s', skipLocked => {
+    const comments = [comment('t1_parent', 'bob'),
+      comment('t1_reply', 'alice', 't1_parent', { locked: true })];
+    expect(countResponses(comments, 'alice', appAuthors, skipLocked)).toBe(1);
+    expect(countOtherUserComments(comments, 'alice', appAuthors, skipLocked)).toBe(1);
+  });
+  it.each([true, false])('always excludes app accounts with skipLocked=%s', skipLocked => {
+    const comments = [comment('t1_app', 'APP'), comment('t1_configured', 'CONFIGURED-APP'),
+      comment('t1_reply', 'alice', 't1_app'), comment('t1_reply2', 'alice', 't1_configured')];
+    expect(countOtherUserComments(comments, 'alice', appAuthors, skipLocked)).toBe(0);
+    expect(countResponses(comments, 'alice', appAuthors, skipLocked)).toBe(0);
   });
 });

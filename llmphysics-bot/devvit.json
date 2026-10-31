@@ -345,25 +345,31 @@
       "nonresponderPostsToCheck": {
         "type": "number",
         "label": "Nonresponder Check — Previous posts to check",
-        "helpText": "Number of qualifying previous posts that must all lack an OP reply to another human (1–10). Scans at most 10 candidate trees. Default: 2.",
+        "helpText": "Number of qualifying previous posts that must all lack an OP reply to another eligible user (1–10). Scans at most 10 candidate trees. Default: 2.",
         "defaultValue": 2
       },
       "nonresponderMinComments": {
         "type": "number",
         "label": "Nonresponder Check — Minimum comments per post",
-        "helpText": "Minimum comments from other users, excluding OP, ignored users, app accounts, removed, deleted, and spam comments (1–100). Default: 3.",
+        "helpText": "Minimum comments from other users, excluding OP, the configured bot/app accounts, missing/deleted authors, removed/deleted/spam comments, and (by default) locked comments (1–100). Default: 3.",
         "defaultValue": 3
       },
-      "nonresponderIgnoredUsers": {
-        "type": "paragraph",
-        "label": "Nonresponder Check — Ignored users",
-        "helpText": "Comma- or newline-separated usernames (whitespace also accepted), case-insensitive, with optional u/ or /u/ prefix. Skips these posters and excludes their comments and replies to them from participation checks. Leave blank for no ignored users; app accounts are always excluded.",
-        "defaultValue": "tap-the-sign, moderator-toolbox, adversarial-review, automoderator"
-      },
-      "nonresponderIgnoreContributors": {
+      "nonresponderSkipLockedComments": {
         "type": "boolean",
-        "label": "Nonresponder Check — Ignore approved users",
-        "helpText": "If enabled, the nonresponder check will not apply to approved users.",
+        "label": "Nonresponder Check — Skip locked comments",
+        "helpText": "Locked comments (e.g. AutoModerator, mod notices, bots/apps) do not count toward minimum other-user comments, and OP replies to locked comments do not count as responses. Unlocked mod comments count normally. A lock on OP’s own reply does not affect engagement.",
+        "defaultValue": true
+      },
+      "nonresponderRunOnMods": {
+        "type": "boolean",
+        "label": "Nonresponder Check — Run on moderators",
+        "helpText": "If off, moderator posts are not checked. For moderators, this setting takes precedence over Run on approved users.",
+        "defaultValue": false
+      },
+      "nonresponderRunOnApprovedUsers": {
+        "type": "boolean",
+        "label": "Nonresponder Check — Run on approved users",
+        "helpText": "If off, approved users’ posts are not checked, except moderators when Run on moderators is on.",
         "defaultValue": true
       },
       "nonresponderReportRepeat": {

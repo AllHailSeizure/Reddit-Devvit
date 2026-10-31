@@ -1,11 +1,3 @@
-export const DEFAULT_IGNORED_USERS = 'tap-the-sign, moderator-toolbox, adversarial-review, automoderator';
-
-export function parseIgnoredUsers(raw: string): Set<string> {
-  return new Set(raw.split(/[,\s]+/)
-    .map(name => name.trim().replace(/^\/?u\//i, '').toLowerCase())
-    .filter(Boolean));
-}
-
 export interface PreviousPost {
   id: string;
   subredditName: string;
@@ -47,29 +39,31 @@ export interface CommentRecord {
   removed: boolean;
   deleted: boolean;
   spam: boolean;
+  locked: boolean;
   body: string;
   distinguished: boolean;
 }
 
-function knownHuman(name: string, op: string, excludedAuthors: ReadonlySet<string>): boolean {
+function eligibleAuthor(name: string, op: string, appAuthors: ReadonlySet<string>): boolean {
   const normalized = name.toLowerCase();
   return !!normalized && normalized !== '[deleted]' && normalized !== '[removed]'
-    && normalized !== op.toLowerCase() && !excludedAuthors.has(normalized);
+    && normalized !== op.toLowerCase() && !appAuthors.has(normalized);
 }
 
-export function countOtherUserComments(comments: CommentRecord[], op: string, excludedAuthors: ReadonlySet<string>): number {
-  return comments.filter(c => knownHuman(c.authorName, op, excludedAuthors)
-    && !c.removed && !c.deleted && !c.spam).length;
+export function countOtherUserComments(comments: CommentRecord[], op: string, appAuthors: ReadonlySet<string>, skipLockedComments = true): number {
+  return comments.filter(c => eligibleAuthor(c.authorName, op, appAuthors)
+    && !c.removed && !c.deleted && !c.spam && (!skipLockedComments || !c.locked)).length;
 }
 
-export function countResponses(comments: CommentRecord[], op: string, excludedAuthors: ReadonlySet<string>): number {
+export function countResponses(comments: CommentRecord[], op: string, appAuthors: ReadonlySet<string>, skipLockedComments = true): number {
   const byId = new Map(comments.map(c => [c.id, c]));
   return comments.filter(c => {
     if (c.authorName.toLowerCase() !== op.toLowerCase() || c.removed || c.deleted || c.spam
       || !c.parentId.startsWith('t1_')) return false;
     const parent = byId.get(c.parentId);
+    // Only the parent lock matters; a later lock on OP’s surviving reply does not.
     // A since-removed parent still establishes engagement if its author is known.
-    return !!parent && knownHuman(parent.authorName, op, excludedAuthors);
+    return !!parent && (!skipLockedComments || !parent.locked) && eligibleAuthor(parent.authorName, op, appAuthors);
   }).length;
 }
 
@@ -81,4 +75,13 @@ export function wasWarned(comments: CommentRecord[], storedId: string | undefine
 
 export function shouldReportRepeat(warned: boolean[], postsToCheck: number): boolean {
   return warned.length === postsToCheck && warned.every(Boolean);
+}
+
+export function shouldCheckPoster({ isMod, isApproved, runOnMods, runOnApprovedUsers }: {
+  isMod: boolean;
+  isApproved: boolean;
+  runOnMods: boolean;
+  runOnApprovedUsers: boolean;
+}): boolean {
+  return isMod ? runOnMods : !isApproved || runOnApprovedUsers;
 }

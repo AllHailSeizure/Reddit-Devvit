@@ -133,13 +133,17 @@ In the Devvit app settings panel (accessible via the subreddit's app settings), 
 
 ### Nonresponder Check
 
-On post submit, checks the author's latest 2 qualifying previous posts here, within their 50 most recent posts across Reddit. Each needs at least 3 surviving comments from other known users: OP, ignored users, the configured bot username, the app account, missing/deleted authors, and removed/deleted/spam comments are excluded. Reddit's total comment count is only a cheap pre-filter. Removed, spam, and deleted posts are skipped; at most 10 candidate trees are fetched newest-first to find enough qualifying posts.
+On post submit, checks the author's latest 2 qualifying previous posts here, within their 50 most recent posts across Reddit. Each needs at least 3 surviving comments from other known users: OP, the configured bot username, the app account, missing/deleted authors, and removed/deleted/spam comments are excluded. Reddit's total comment count is only a cheap pre-filter. Removed, spam, and deleted posts are skipped; at most 10 candidate trees are fetched newest-first to find enough qualifying posts.
 
-An OP response must be a surviving, non-spam reply to another known human's comment, at any depth. Top-level OP comments and replies to self, ignored users, or app accounts do not count. A removed/deleted parent still counts if its human author is known; missing parents and unknown/deleted parent authors do not. If no qualifying post has an OP response, the app posts a distinguished, stickied, locked warning on the new post with `botSignature`. Warnings have no repeat limit; the post stays open.
+An OP response must be a surviving, non-spam reply to another eligible user's comment, at any depth. Top-level OP comments and replies to self or app accounts do not count. A removed/deleted parent still counts if its eligible author is known; missing parents and unknown/deleted parent authors do not. If no qualifying post has an OP response, the app posts a distinguished, stickied, locked warning on the new post with `botSignature`. Warnings have no repeat limit; the post stays open.
 
 When every checked qualifying post was also warned, the app additionally reports the new post to moderators after posting its warning, with reason “Nonresponder: repeated warnings ignored”. `nonresponderReportRepeat` can disable reporting. Warning comment IDs are stored in `bot:nrmod:warned:{postId}` for 180 days. Without a tracking key, a distinguished comment by the configured bot or app account starting with the current warning text counts as a previous warning. Changing that text or losing/removing older comments can prevent fallback detection after expiry. Report failures are logged; `bot:nrmod:log` records whether escalation was requested and reporting succeeded.
 
-Ignored users and app accounts are skipped. Moderator status grants no exemption; approved submitters remain exempt by default. Missing authors/app identity, insufficient history, API failures, and incomplete comment scans produce no warning. Each tree is limited to 500 comments and 50 listings; hitting either limit skips enforcement. A seven-day atomic Redis claim prevents duplicate warning submissions within that window.
+Moderators are exempt by default (`nonresponderRunOnMods=false`); approved users are checked by default (`nonresponderRunOnApprovedUsers=true`). For a moderator who is also approved, the moderator setting wins. Always skip missing/deleted posters and the app's own account/configured bot username; those two app authors are also excluded from other-user counts, reply parents, and used for warning detection. Other bots/apps are checked like anyone else, with exemptions only through moderator/approved status; there is no username list.
+
+With `nonresponderSkipLockedComments=true` (default), locked comments (including AutoModerator, mod notices, or bots/apps) do not count toward the minimum, and OP replies to locked parents do not count as responses. Unlocked moderator comments count normally. A lock on OP's own reply does not matter: it counts if the reply survives and its parent is eligible. Turning this off lets locked comments and replies to them count, except app authors remain excluded.
+
+Missing app identity, insufficient history, API failures, and incomplete comment scans produce no warning. Each tree is limited to 500 comments and 50 listings; hitting either limit skips enforcement. A seven-day atomic Redis claim prevents duplicate warning submissions within that window.
 
 Settings are in the app installation settings (`devvit.json` → `settings.subreddit`):
 
@@ -149,11 +153,11 @@ Settings are in the app installation settings (`devvit.json` → `settings.subre
 | `nonresponderPostsToCheck` | `2` (1–10) |
 | `nonresponderMinComments` | `3` (1–100), other-user comments only |
 | `nonresponderReportRepeat` | `true` |
-| `nonresponderIgnoredUsers` | `tap-the-sign, moderator-toolbox, adversarial-review, automoderator` |
-| `nonresponderIgnoreContributors` | `true` |
+| `nonresponderSkipLockedComments` | `true` |
+| `nonresponderRunOnMods` | `false` |
+| `nonresponderRunOnApprovedUsers` | `true` |
 | `nonresponderResponse` | Responding to commenters is a subreddit rule. You did not respond on your recent qualifying posts. Please engage with the comments on this post by replying to commenters. |
 
-Ignored usernames accept commas, newlines, or whitespace, optional `u/` or `/u/` prefixes, and any letter case. An unsaved list uses the default; a saved blank list ignores nobody. The configured bot username and app account are always skipped and excluded from comment counts and reply targets.
 
 Invalid numeric thresholds use defaults. A blank warning suppresses posting. Live testing should verify nested replies, removed/deleted comments, exemption settings, duplicate delivery, warning locking/stickying, report delivery, and warning tracking/fallback. Local decision tests: `npm test -w @llmphysics/bot-core`.
 
