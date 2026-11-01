@@ -5,6 +5,13 @@ CI checks pull requests and pushes to `master`, `develop`, `publish-bot`, and
 come from `package-lock.json` using `npm ci`; successful build artifacts are kept
 for seven days. The existing GitHub Pages workflow still publishes the legal site.
 
+Hosted jobs use Ubuntu 24.04 and install its `redis-server` package before npm.
+`REDISMS_SYSTEM_BINARY=/usr/bin/redis-server` tells the Devvit test harness to use
+that executable for isolated Redis instances. This avoids downloading and
+compiling Redis during npm installation and keeps the actual Redis-backed tests.
+For local Linux checks, install Redis and export that variable before `npm ci`
+to use the same setup.
+
 | App directory | Devvit app | Checks |
 | --- | --- | --- |
 | `moderator-toolbox` | `moderator-toolbox` | Nonresponder unit tests, both process-review regression suites, Vite build |

@@ -28,9 +28,10 @@ concurrency:
 
 jobs:
   release:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     env:
+      REDISMS_SYSTEM_BINARY: /usr/bin/redis-server
       APP: ${{ inputs.app }}
       RELEASE_VERSION: ${{ inputs.version }}
       PUBLIC_RELEASE: ${{ inputs.public_release }}
@@ -61,6 +62,12 @@ jobs:
         with:
           node-version-file: .node-version
           cache: npm
+
+      - name: Install Redis for Devvit tests
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends redis-server
+          redis-server --version
 
       - name: Install locked dependencies
         run: npm ci --no-audit --no-fund
