@@ -1,12 +1,17 @@
 {
+  "scripts": {
+    "check": "npm run check --workspace ./moderator-toolbox --workspace ./adversarial-review --workspace ./sub-bingo"
+  },
   "workspaces": [
     "packages/*",
     "llmphysics-bot",
+    "moderator-toolbox",
+    "adversarial-review",
     "sub-bingo",
     "review-bot",
     "tap-the-sign"
   ],
   "devDependencies": {
-    "devvit": "^1.0.0"
+    "devvit": "0.13.6"
   }
 }

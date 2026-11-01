@@ -3,6 +3,7 @@
   "version": "2.15.2.1",
   "private": true,
   "scripts": {
+    "check": "npm test && node supabase/functions/process-review/url-resolution.test.mjs && node supabase/functions/process-review/resolve-guard.test.mjs && npm run build",
     "build": "vite build",
     "build:categories": "node scripts/build-category-db.mjs",
     "dev": "devvit playtest r/llmphysics_dev",

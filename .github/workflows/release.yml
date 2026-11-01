@@ -1,0 +1,97 @@
+name: Release Devvit app
+run-name: Release ${{ inputs.app }} ${{ inputs.version }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      app:
+        description: App directory to release
+        required: true
+        type: choice
+        options: [moderator-toolbox, adversarial-review, sub-bingo]
+      version:
+        description: Exact stable version to publish (for example 2.16.0)
+        required: true
+        type: string
+      public_release:
+        description: Submit for public review (otherwise publish unlisted)
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+# Keep one upload active at a time, including releases of different apps.
+concurrency:
+  group: devvit-release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      APP: ${{ inputs.app }}
+      RELEASE_VERSION: ${{ inputs.version }}
+      PUBLIC_RELEASE: ${{ inputs.public_release }}
+    steps:
+      - name: Validate release request
+        shell: bash
+        run: |
+          if [[ "$GITHUB_REF" != refs/heads/master ]]; then
+            echo '::error::Releases must run from master.'
+            exit 1
+          fi
+          case "$APP" in
+            moderator-toolbox|adversarial-review|sub-bingo) ;;
+            *) echo '::error::Unknown app.'; exit 1 ;;
+          esac
+          if ! [[ "$RELEASE_VERSION" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+            echo '::error::Version must be a stable three-part version, for example 2.16.0.'
+            exit 1
+          fi
+
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .node-version
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Test and build
+        run: npm run check --workspace "./$APP"
+
+      - name: Verify Devvit authentication
+        env:
+          DEVVIT_AUTH_TOKEN: ${{ secrets.DEVVIT_AUTH_TOKEN }}
+        run: |
+          if [[ -z "$DEVVIT_AUTH_TOKEN" ]]; then
+            echo '::error::Add the DEVVIT_AUTH_TOKEN Actions secret. See CI-CD.md.'
+            exit 1
+          fi
+          npm exec --no --workspace "./$APP" -- devvit whoami </dev/null
+          npm exec --no --workspace "./$APP" -- devvit list apps </dev/null
+
+      - name: Publish selected version
+        env:
+          DEVVIT_AUTH_TOKEN: ${{ secrets.DEVVIT_AUTH_TOKEN }}
+          DEVVIT_ALLOW_SOURCE_UPLOAD: '1'
+        shell: bash
+        run: |
+          args=(publish --version "$RELEASE_VERSION")
+          if [[ "$PUBLIC_RELEASE" == true ]]; then
+            args+=(--public)
+          fi
+          npm exec --no --workspace "./$APP" -- devvit "${args[@]}" </dev/null
+
+      - name: Record release
+        run: |
+          printf '### Published %s\n\n- Version: `%s`\n- Commit: `%s`\n- Public review requested: `%s`\n' \
+            "$APP" "$RELEASE_VERSION" "$GITHUB_SHA" "$PUBLIC_RELEASE" >> "$GITHUB_STEP_SUMMARY"
