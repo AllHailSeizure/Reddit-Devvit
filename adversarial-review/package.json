@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
+    "check": "npm run build",
     "build": "vite build",
     "dev": "devvit playtest r/llmphysics_dev",
     "lint": "eslint src",

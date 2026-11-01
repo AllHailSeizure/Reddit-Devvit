@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
+    "check": "npm test && npm run build",
     "build": "vite build && node tools/strip-sourcemaps.mjs",
     "dev": "devvit playtest r/llmphysics_dev",
     "lint": "eslint src",
