@@ -58,6 +58,7 @@ src/server/
 │   ├── depth-cap-moderator.ts       Comment depth enforcement
 │   ├── self-response-moderator.ts   OP self-reply enforcement
 │   ├── nonresponder-check.ts        OP participation warning
+│   ├── predatory-journal-watch.ts   Predatory/hijacked journal warning
 │   ├── length-moderator.ts          Post length enforcement
 │   └── report-moderator.ts          Bot-report ignorer
 ├── action-modules/
@@ -161,6 +162,44 @@ Settings are in the app installation settings (`devvit.json` → `settings.subre
 
 
 Invalid numeric thresholds use defaults. A blank warning suppresses posting. Live testing should verify nested replies, removed/deleted comments, exemption settings, duplicate delivery, warning locking/stickying, report delivery, and warning tracking/fallback. Local decision tests: `npm test` (from `moderator-toolbox/`).
+
+### Predatory Journal Watch
+
+**File:** `src/server/trigger-modules/predatory-journal-watch.ts` (pure decisions in `predatory-journal-decision.ts`)
+**Triggers:** `onPostSubmit`, `onCommentCreate`
+
+Integrity warning only. The module never removes, locks the user's content, or files a report. It looks for journal links and DOIs in the post body and link URL, and in comment bodies when `predatoryWatchCheckComments` is on.
+
+A direct link matches when its host is a watchlist domain or a subdomain of one (`www.` is ignored). A DOI is resolved through `doi.org/doiRA`, then Crossref or DataCite, and the landing or resource host is compared the same way. Publisher-name matching is a weak secondary check and is off by default. ISSN is never used. Malformed DOIs that do not start with `10.` are ignored. DOI lookups are cached in Redis for 14 days.
+
+The watchlist lives in Supabase table `predatory_watchlist` and is cached in Redis (`bot:pjmod:watchlist`) for `predatoryWatchCacheTtlHours` (default 6). The daily refresh is the `sync-predatory-watchlist` edge function (Retraction Watch hijacked URLs only, plus Beall's List publisher, standalone, and hijacked pages). See the deploy notes below. An allowlist of domains or publisher names never warns; the default includes MDPI (`mdpi.com`) and Frontiers (`frontiersin.org`). Clearing the allowlist removes those exemptions. Name tokens match whole words, so the default name `Frontiers` also covers "Frontiers Media".
+
+**What gets posted.** Several publishers in one post or comment are combined into a single comment, one paragraph per publisher, using `predatoryWatchWarning` plus `botSignature`. A blank warning posts nothing. On a post the comment is top-level, distinguished, stickied, and locked. On a comment it is a reply, distinguished and locked (a reply cannot be stickied). The app account, and comments it wrote, are skipped.
+
+**Once per publisher per post.** Redis keys `bot:pjmod:pub:{postId}:{publisherKey}` last 180 days. If that publisher was already warned on the post, a later comment that links it does nothing. A comment that also links a new publisher warns about the new one only. Trigger retries are deduped with `bot:pjmod:handled:{contentId}` for 7 days.
+
+**Settings** (`devvit.json` → `settings.subreddit`):
+
+| Key | Default |
+|-----|---------|
+| `predatoryWatchEnabled` | `true` |
+| `predatoryWatchCheckComments` | `true` |
+| `predatoryWatchWarning` | `Note that {publisher} appears on [{source_list}]({source_url}) as a possible [predatory journal](https://en.wikipedia.org/wiki/Predatory_publishing).` |
+| `predatoryWatchAllowlist` | `mdpi.com`, `frontiersin.org`, `MDPI`, `Frontiers` |
+| `predatoryWatchMatchPublisherName` | `false` |
+| `predatoryWatchCrossrefMailto` | blank (Crossref is still called, with a generic user agent) |
+| `predatoryWatchCacheTtlHours` | `6` |
+
+Placeholders: `{publisher}`, `{source_list}` or `{source list}`, `{source_url}`. Requires the existing global `supabaseUrl` and `supabaseServiceKey`. New HTTP domains `doi.org`, `api.crossref.org`, and `api.datacite.org` are declared in `devvit.json` (the Supabase host is already listed) and may need Reddit approval before playtest.
+
+**Deploying the watchlist sync (manual; this repo does not apply it):**
+
+1. Apply `supabase/migrations/014_predatory_watchlist.sql` to the Supabase project (`eimdgqymjwfljtapnuyl`). Do not apply it from an unattended agent.
+2. Deploy the function: `supabase functions deploy sync-predatory-watchlist` from `moderator-toolbox/`.
+3. Schedule it daily with `supabase/functions/sync-predatory-watchlist/CRON.sql` (Vault secrets `project_url` and `service_role_key`, cron `0 6 * * *`) or an equivalent Dashboard schedule. The function requires `Authorization: Bearer <service role key>`.
+4. Publish a new Devvit version only after Reddit approves the new HTTP domains. Until the table has rows, the app caches nothing and simply does not warn.
+
+Local tests: `npm test` covers URL/DOI extraction, domain matching, the allowlist, once-per-publisher filtering, and the sync parsers. Parsers are not called against the live sheet or Beall's List during tests.
 
 ### Flood Moderator
 
@@ -482,6 +521,13 @@ If Gemini 2.5 Flash Lite is rate-limited (HTTP 429), the command falls back to G
 | `responseToolEnabled` | Saved Responses | boolean | `true` |
 | `defineCommandEnabled` | !define | boolean | `true` |
 | `geminiApiKey` | !define | string | — |
+| `predatoryWatchEnabled` | Predatory Journal Watch | boolean | `true` |
+| `predatoryWatchCheckComments` | Predatory Journal Watch | boolean | `true` |
+| `predatoryWatchWarning` | Predatory Journal Watch | string | predatory-journal note |
+| `predatoryWatchAllowlist` | Predatory Journal Watch | string | MDPI, Frontiers |
+| `predatoryWatchMatchPublisherName` | Predatory Journal Watch | boolean | `false` |
+| `predatoryWatchCrossrefMailto` | Predatory Journal Watch | string | `''` |
+| `predatoryWatchCacheTtlHours` | Predatory Journal Watch | number | `6` |
 | `supabaseUrl` | Bot logs | string | — |
 | `supabaseServiceKey` | Bot logs | string | — |
 

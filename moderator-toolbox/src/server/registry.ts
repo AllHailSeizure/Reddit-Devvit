@@ -38,6 +38,7 @@ import { register as registerAdmin } from './admin';
 import { run as runDepthCapModerator } from './trigger-modules/depth-cap-moderator';
 import { run as runSelfResponseModerator } from './trigger-modules/self-response-moderator';
 import { run as runNonresponderCheck } from './trigger-modules/nonresponder-check';
+import { runOnComment as runPredatoryOnComment, runOnPost as runPredatoryOnPost } from './trigger-modules/predatory-journal-watch';
 import { runQuotaCheck, runOnModAction as runFloodOnModAction, runOnPostDelete as runFloodOnPostDelete } from './trigger-modules/flood-moderator';
 
 // ─── Trigger arrays ────────────────────────────────────────────────────────────
@@ -45,9 +46,9 @@ import { runQuotaCheck, runOnModAction as runFloodOnModAction, runOnPostDelete a
 
 const APP_INSTALL:       AppInstallHandler[]    = [];
 const APP_UPGRADE:       AppUpgradeHandler[]    = [];
-const POST_SUBMIT:       PostSubmitHandler[]    = [runOnPost, runQuotaCheck, runLengthModerator, runNonresponderCheck];
+const POST_SUBMIT:       PostSubmitHandler[]    = [runOnPost, runQuotaCheck, runLengthModerator, runNonresponderCheck, runPredatoryOnPost];
 const POST_FLAIR_UPDATE: PostFlairUpdateHandler[] = [runLengthFlairUpdate, runFlairTransfer];
-const COMMENT_CREATE:    CommentCreateHandler[] = [runOnComment, runDepthCapModerator, runSelfResponseModerator];
+const COMMENT_CREATE:    CommentCreateHandler[] = [runOnComment, runDepthCapModerator, runSelfResponseModerator, runPredatoryOnComment];
 const POST_REPORT:    PostReportHandler[]    = [runOnPostReport];
 const COMMENT_REPORT: CommentReportHandler[] = [runOnCommentReport];
 const MOD_ACTIONS:    ModActionsHandler[]    = [runFloodOnModAction];
