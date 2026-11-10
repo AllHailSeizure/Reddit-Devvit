@@ -1,10 +1,10 @@
 -- Predatory and hijacked journal domains for the predatory-journal-watch module.
--- The Devvit app matches link and DOI landing domains against active rows.
+-- The resolve-doi edge function matches link and DOI landing domains against active rows.
 -- ISSN is intentionally absent: hijacked journals copy real ISSNs.
 --
 -- Writes come from the sync-predatory-watchlist edge function using the
 -- service role (RLS bypass). anon/authenticated may read active rows only,
--- matching bingo_tiles. The app itself reads with supabaseServiceKey.
+-- matching bingo_tiles. resolve-doi reads with the service role.
 
 CREATE TABLE predatory_watchlist (
   id            BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -43,4 +43,4 @@ GRANT SELECT ON predatory_watchlist TO authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON predatory_watchlist TO service_role;
 
 COMMENT ON TABLE predatory_watchlist IS
-  'Active predatory/hijacked domains. Refreshed by sync-predatory-watchlist. See supabase/functions/sync-predatory-watchlist/CRON.sql for the daily schedule (applied manually; not part of db push).';
+  'Active predatory/hijacked domains. Refreshed by sync-predatory-watchlist and read by resolve-doi. See supabase/functions/sync-predatory-watchlist/CRON.sql for the daily schedule (applied manually; not part of db push).';

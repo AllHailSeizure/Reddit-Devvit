@@ -4,29 +4,16 @@ import { logger, logZSet } from '../helpers/log-helper';
 import { formatSignature } from '../helpers/settings-helper';
 import type { CommentId, PostId } from '../types';
 import {
-  DEFAULT_ALLOWLIST,
-  DEFAULT_CACHE_TTL_HOURS,
   DEFAULT_WARNING,
-  DOI_CACHE_TTL_MS,
   HANDLED_TTL_MS,
   WARNED_TTL_MS,
-  cacheTtlMs,
-  doiCacheKey,
   extractDois,
   hitKeys,
-  hostsFromCrossref,
-  hostsFromDatacite,
   hostsFromText,
   isAppAuthor,
-  matchPublication,
-  mergeHits,
-  parseAllowlist,
-  registrationAgency,
   renderWarning,
   warnedPublisherKey,
   type JournalHit,
-  type ResolvedPublication,
-  type WatchEntry,
 } from './predatory-journal-decision';
 
 export const MODULE = {
@@ -37,8 +24,6 @@ export const MODULE = {
   redisKeys: [
     'bot:pjmod:handled:{contentId}',
     'bot:pjmod:pub:{postId}:{publisherKey}',
-    'bot:pjmod:watchlist',
-    'bot:pjmod:doi:{doi}',
     'bot:pjmod:log',
   ],
   settings: [
@@ -47,8 +32,6 @@ export const MODULE = {
     'predatoryWatchWarning',
     'predatoryWatchAllowlist',
     'predatoryWatchMatchPublisherName',
-    'predatoryWatchCrossrefMailto',
-    'predatoryWatchCacheTtlHours',
     'botSignature',
     'supabaseUrl',
     'supabaseServiceKey',
@@ -56,9 +39,7 @@ export const MODULE = {
 } as const;
 
 const log = logger(MODULE.name);
-const WATCHLIST_KEY = 'bot:pjmod:watchlist';
 const LOG_KEY = 'bot:pjmod:log';
-const GENERIC_UA = 'moderator-toolbox/predatory-journal-watch (https://www.reddit.com/r/LLMPhysics)';
 
 interface ScanTarget {
   kind: 'post' | 'comment';
@@ -109,13 +90,11 @@ async function scan(target: ScanTarget): Promise<void> {
     if (await redis.get(`bot:pjmod:handled:${target.contentId}`)) return;
     if (!target.authorName || target.authorName.toLowerCase() === '[deleted]') return;
 
-    const [warning, allowRaw, matchNames, mailto, signature, ttlHours] = await Promise.all([
+    const [warning, allowRaw, matchNames, signature] = await Promise.all([
       settings.get<string>('predatoryWatchWarning'),
       settings.get<string>('predatoryWatchAllowlist'),
       settings.get<boolean>('predatoryWatchMatchPublisherName'),
-      settings.get<string>('predatoryWatchCrossrefMailto'),
       settings.get<string>('botSignature'),
-      settings.get<number>('predatoryWatchCacheTtlHours'),
     ]);
     const template = warning ?? DEFAULT_WARNING;
     if (!template.trim()) return;
@@ -134,18 +113,10 @@ async function scan(target: ScanTarget): Promise<void> {
       return;
     }
 
-    const entries = await loadWatchlist(cacheTtlMs(ttlHours ?? DEFAULT_CACHE_TTL_HOURS));
-    if (!entries) return;
-    const allowlist = parseAllowlist(allowRaw ?? DEFAULT_ALLOWLIST);
-    const resolved = await resolveDois(dois, (mailto ?? '').trim());
-    const useNames = matchNames ?? false;
-    let hits = matchPublication(directHosts, null, entries, allowlist, false);
-    for (const publication of resolved) {
-      hits = mergeHits([
-        ...hits,
-        ...matchPublication(publication.hosts, publication.publisher, entries, allowlist, useNames),
-      ]);
-    }
+    const resolved = await resolveHits(directHosts, dois, allowRaw ?? null, matchNames ?? false);
+    // Missing Supabase settings, or an empty watchlist, should retry on the next delivery.
+    if (!resolved || resolved.watchlistCount === 0) return;
+    const hits = resolved.hits;
     if (hits.length === 0) {
       await markHandled(target.contentId);
       return;
@@ -257,125 +228,56 @@ async function releaseClaims(postId: string, contentId: string, hits: JournalHit
   }
 }
 
-async function loadWatchlist(ttlMs: number): Promise<WatchEntry[] | null> {
-  try {
-    const cached = await redis.get(WATCHLIST_KEY);
-    if (cached) {
-      const parsed = JSON.parse(cached) as { entries?: WatchEntry[] };
-      if (Array.isArray(parsed.entries)) return parsed.entries;
-    }
-  } catch (err) {
-    log.warn('watchlist_cache_read_failed', { error: (err as Error).message });
-  }
+interface ResolveResponse {
+  hits: JournalHit[];
+  watchlistCount: number;
+}
 
+async function resolveHits(
+  hosts: string[],
+  dois: string[],
+  allowlist: string | null,
+  matchPublisherName: boolean,
+): Promise<ResolveResponse | null> {
   const supabaseUrl = ((await settings.get<string>('supabaseUrl')) || '').replace(/\/$/, '');
   const supabaseKey = (await settings.get<string>('supabaseServiceKey')) || '';
   if (!supabaseUrl || !supabaseKey) {
-    log.warn('watchlist_unconfigured', { reason: 'supabaseUrl or supabaseServiceKey is blank' });
+    log.warn('resolve_unconfigured', { reason: 'supabaseUrl or supabaseServiceKey is blank' });
     return null;
   }
-
-  try {
-    const entries = await fetchWatchlist(supabaseUrl, supabaseKey);
-    // An empty table (sync not deployed yet) should be retried on the next event.
-    if (entries.length > 0) {
-      await redis.set(WATCHLIST_KEY, JSON.stringify({ entries }), { expiration: new Date(Date.now() + ttlMs) });
-    }
-    return entries;
-  } catch (err) {
-    log.error('watchlist_fetch_failed', err, {});
-    return null;
+  const res = await fetch(`${supabaseUrl}/functions/v1/resolve-doi`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      apikey: supabaseKey,
+      Authorization: `Bearer ${supabaseKey}`,
+    },
+    body: JSON.stringify({ hosts, dois, allowlist, matchPublisherName }),
+  });
+  if (!res.ok) throw new Error(`resolve-doi HTTP ${res.status}`);
+  const body = await res.json() as { hits?: unknown; watchlistCount?: unknown };
+  const watchlistCount = typeof body.watchlistCount === 'number' ? body.watchlistCount : 0;
+  if (watchlistCount === 0) {
+    log.warn('watchlist_empty', { reason: 'resolve-doi returned no watchlist rows' });
   }
+  return { hits: asHits(body.hits), watchlistCount };
 }
 
-async function fetchWatchlist(supabaseUrl: string, supabaseKey: string): Promise<WatchEntry[]> {
-  const entries: WatchEntry[] = [];
-  const pageSize = 1000;
-  let previousFirst = '';
-  for (let offset = 0; offset < 50000; offset += pageSize) {
-    const url = `${supabaseUrl}/rest/v1/predatory_watchlist?active=eq.true&select=domain,name,source_list,source_url,list_type&order=domain.asc,source_list.asc&limit=${pageSize}&offset=${offset}`;
-    const res = await fetch(url, {
-      headers: {
-        apikey: supabaseKey,
-        Authorization: `Bearer ${supabaseKey}`,
-        Accept: 'application/json',
-      },
+function asHits(value: unknown): JournalHit[] {
+  if (!Array.isArray(value)) return [];
+  const hits: JournalHit[] = [];
+  for (const row of value) {
+    if (!row || typeof row !== 'object') continue;
+    const hit = row as Record<string, unknown>;
+    if (typeof hit.publisherKey !== 'string' || typeof hit.domain !== 'string') continue;
+    hits.push({
+      publisherKey: hit.publisherKey,
+      nameKey: typeof hit.nameKey === 'string' ? hit.nameKey : null,
+      publisher: typeof hit.publisher === 'string' ? hit.publisher : hit.domain,
+      sourceList: typeof hit.sourceList === 'string' ? hit.sourceList : '',
+      sourceUrl: typeof hit.sourceUrl === 'string' ? hit.sourceUrl : '',
+      domain: hit.domain,
     });
-    if (!res.ok) throw new Error(`watchlist HTTP ${res.status}`);
-    const rows = await res.json() as Array<Record<string, unknown>>;
-    if (!Array.isArray(rows) || rows.length === 0) break;
-    const first = typeof rows[0]?.domain === 'string' ? rows[0].domain : '';
-    if (first && first === previousFirst) break;
-    previousFirst = first;
-    for (const row of rows) {
-      if (typeof row.domain !== 'string' || !row.domain) continue;
-      entries.push({
-        domain: row.domain,
-        name: typeof row.name === 'string' ? row.name : '',
-        sourceList: typeof row.source_list === 'string' ? row.source_list : '',
-        sourceUrl: typeof row.source_url === 'string' ? row.source_url : '',
-        listType: typeof row.list_type === 'string' ? row.list_type : '',
-      });
-    }
-    if (rows.length < pageSize) break;
   }
-  return entries;
-}
-
-async function resolveDois(dois: string[], mailto: string): Promise<ResolvedPublication[]> {
-  const resolved: ResolvedPublication[] = [];
-  for (const doi of dois) {
-    const publication = await resolveDoi(doi, mailto);
-    if (publication) resolved.push(publication);
-  }
-  return resolved;
-}
-
-async function resolveDoi(doi: string, mailto: string): Promise<ResolvedPublication | null> {
-  const key = doiCacheKey(doi);
-  try {
-    const cached = await redis.get(key);
-    if (cached) return JSON.parse(cached) as ResolvedPublication;
-  } catch (err) {
-    log.warn('doi_cache_read_failed', { error: (err as Error).message });
-  }
-  try {
-    const publication = await lookupDoi(doi, mailto);
-    await redis.set(key, JSON.stringify(publication), { expiration: new Date(Date.now() + DOI_CACHE_TTL_MS) });
-    return publication;
-  } catch (err) {
-    log.warn('doi_lookup_failed', { error: (err as Error).message, reason: doi });
-    return null;
-  }
-}
-
-async function lookupDoi(doi: string, mailto: string): Promise<ResolvedPublication> {
-  const userAgent = mailto ? `moderator-toolbox/predatory-journal-watch (mailto:${mailto})` : GENERIC_UA;
-  const headers = { Accept: 'application/json', 'User-Agent': userAgent };
-  const empty: ResolvedPublication = { hosts: [], publisher: null };
-  const agencyRes = await fetch(`https://doi.org/doiRA/${encodeURIComponent(doi)}`, { headers });
-  const agencyBody = await readDoiBody(agencyRes, 'doiRA');
-  if (!agencyBody) return empty;
-  const agency = registrationAgency(agencyBody);
-  if (agency === 'crossref') {
-    const query = mailto ? `?mailto=${encodeURIComponent(mailto)}` : '';
-    const res = await fetch(`https://api.crossref.org/works/${encodeURIComponent(doi)}${query}`, { headers });
-    const body = await readDoiBody(res, 'crossref');
-    return body ? hostsFromCrossref(body) : empty;
-  }
-  if (agency === 'datacite') {
-    const res = await fetch(`https://api.datacite.org/dois/${encodeURIComponent(doi)}`, {
-      headers: { ...headers, Accept: 'application/vnd.api+json' },
-    });
-    const body = await readDoiBody(res, 'datacite');
-    return body ? hostsFromDatacite(body) : empty;
-  }
-  return empty;
-}
-
-/** 4xx is a cacheable miss. 5xx throws so the caller does not cache a transient failure. */
-async function readDoiBody(res: Response, source: string): Promise<unknown | null> {
-  if (res.status >= 500) throw new Error(`${source} HTTP ${res.status}`);
-  if (!res.ok) return null;
-  return res.json();
+  return hits;
 }

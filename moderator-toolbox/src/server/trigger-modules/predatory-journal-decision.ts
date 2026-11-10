@@ -10,7 +10,6 @@ export const DEFAULT_WARNING =
 
 export const DEFAULT_ALLOWLIST = 'mdpi.com\nfrontiersin.org\nMDPI\nFrontiers';
 
-export const DEFAULT_CACHE_TTL_HOURS = 6;
 export const WARNED_TTL_MS = 180 * 24 * 60 * 60 * 1000;
 export const HANDLED_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 export const DOI_CACHE_TTL_MS = 14 * 24 * 60 * 60 * 1000;
@@ -361,20 +360,9 @@ export function renderWarning(template: string, hits: JournalHit[]): string {
     .split('{source_url}').join(hit.sourceUrl)).join('\n\n');
 }
 
-export function cacheTtlMs(hours: number | null | undefined): number {
-  if (typeof hours !== 'number' || !Number.isInteger(hours) || hours < 1 || hours > 168) {
-    return DEFAULT_CACHE_TTL_HOURS * 60 * 60 * 1000;
-  }
-  return hours * 60 * 60 * 1000;
-}
-
 export function isAppAuthor(name: string | undefined, appUsername: string | undefined): boolean {
   if (!name || !appUsername) return false;
   return name.trim().toLowerCase() === appUsername.trim().toLowerCase();
-}
-
-export function doiCacheKey(doi: string): string {
-  return `bot:pjmod:doi:${doi.toLowerCase().replace(/[^a-z0-9]+/g, '_')}`;
 }
 
 export function warnedPublisherKey(postId: string, publisherKey: string): string {

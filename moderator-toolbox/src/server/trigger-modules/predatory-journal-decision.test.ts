@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_ALLOWLIST,
   DEFAULT_WARNING,
-  cacheTtlMs,
   domainMatches,
   extractDois,
   extractUrls,
@@ -172,11 +171,7 @@ describe('once per publisher per post', () => {
 });
 
 describe('settings helpers', () => {
-  it('falls back for unsafe cache ttl values and identifies the app account', () => {
-    expect(cacheTtlMs(6)).toBe(6 * 60 * 60 * 1000);
-    expect(cacheTtlMs(0)).toBe(6 * 60 * 60 * 1000);
-    expect(cacheTtlMs(1.5)).toBe(6 * 60 * 60 * 1000);
-    expect(cacheTtlMs(null)).toBe(6 * 60 * 60 * 1000);
+  it('identifies the app account and parses the allowlist', () => {
     expect(isAppAuthor('LLMPhysics-bot', 'llmphysics-bot')).toBe(true);
     expect(isAppAuthor('someone', 'llmphysics-bot')).toBe(false);
     expect(parseAllowlist(undefined)).toEqual(parseAllowlist(DEFAULT_ALLOWLIST));

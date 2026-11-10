@@ -374,6 +374,10 @@ verify_jwt = false
 [functions.sync-predatory-watchlist]
 verify_jwt = false
 
+# Same auth as sync-predatory-watchlist: the function checks the bearer itself.
+[functions.resolve-doi]
+verify_jwt = false
+
 [edge_runtime]
 enabled = true
 # Supported request policies: `oneshot`, `per_worker`.

@@ -12,7 +12,7 @@
   },
   "permissions": {
     "http": {
-      "domains": ["en.wikipedia.org", "generativelanguage.googleapis.com", "eimdgqymjwfljtapnuyl.supabase.co", "doi.org", "api.crossref.org", "api.datacite.org"]
+      "domains": ["en.wikipedia.org", "generativelanguage.googleapis.com", "eimdgqymjwfljtapnuyl.supabase.co"]
     },
     "redis": true,
     "reddit": {
@@ -395,18 +395,6 @@
         "label": "Predatory Journal Watch — Match publisher names",
         "helpText": "Weak secondary check: compare a DOI's publisher name to watchlist names when the landing domain did not match. Off by default. ISSN is never used.",
         "defaultValue": false
-      },
-      "predatoryWatchCrossrefMailto": {
-        "type": "string",
-        "label": "Predatory Journal Watch — Crossref contact email",
-        "helpText": "Optional mailto address sent to the Crossref API. Leave blank to call Crossref with a generic user agent.",
-        "defaultValue": ""
-      },
-      "predatoryWatchCacheTtlHours": {
-        "type": "number",
-        "label": "Predatory Journal Watch — Watchlist cache (hours)",
-        "helpText": "How long to cache the Supabase watchlist in Redis. Default: 6. Valid range 1–168; other values use 6.",
-        "defaultValue": 6
       }
     }
   },
