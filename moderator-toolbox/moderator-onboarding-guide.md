@@ -38,6 +38,8 @@ On a post, the note is a stickied, distinguished, locked comment. On a comment, 
 
 MDPI and Frontiers are allowlisted by default, so links to them do not produce a note even if an old list mentions them. You can add other domains or publisher names in the app settings (`predatoryWatchAllowlist`), change the wording (`predatoryWatchWarning`), or turn the check off (`predatoryWatchEnabled`). Clearing the warning text makes the bot stay quiet. Comment checking is on by default (`predatoryWatchCheckComments`).
 
+The check needs the app-level secret `supabaseFunctionToken` (or `supabaseServiceKey`) to reach the Supabase watchlist. If neither is set, the bot stays quiet rather than guessing.
+
 The lists behind the warning are the Retraction Watch Hijacked Journal Checker (hijacked sites only) and Beall's List. They are refreshed outside the bot. A newly added or removed site is used the next time someone posts or comments. There is no separate delay setting.
 
 ---

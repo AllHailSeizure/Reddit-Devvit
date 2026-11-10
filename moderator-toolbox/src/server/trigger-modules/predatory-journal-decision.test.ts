@@ -16,6 +16,8 @@ import {
   registrableDomain,
   registrationAgency,
   renderWarning,
+  resolveBearer,
+  resolveDoiHeaders,
   selectUnwarned,
   type WatchEntry,
 } from './predatory-journal-decision';
@@ -180,6 +182,21 @@ describe('settings helpers', () => {
     expect(parseAllowlist('example.com, Real Publisher\nsecond.example')).toEqual({
       domains: ['example.com', 'second.example'],
       names: ['Real Publisher'],
+    });
+  });
+});
+
+describe('resolve-doi credentials', () => {
+  it('prefers the function token and falls back to the service key', () => {
+    expect(resolveBearer('tok', 'svc')).toBe('tok');
+    expect(resolveBearer('  ', 'svc')).toBe('svc');
+    expect(resolveBearer(undefined, null)).toBe('');
+  });
+
+  it('sends only the bearer, no apikey header', () => {
+    expect(resolveDoiHeaders('tok')).toEqual({
+      'Content-Type': 'application/json',
+      Authorization: 'Bearer tok',
     });
   });
 });

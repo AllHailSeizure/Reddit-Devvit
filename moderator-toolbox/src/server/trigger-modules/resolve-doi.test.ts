@@ -5,7 +5,10 @@ import {
   type WatchEntry,
 } from './predatory-journal-decision';
 import {
+  bearerAuthorized,
   resolveHits,
+  sha256Hex,
+  timingSafeEqual,
   type DoiCacheRow,
   type ResolveDeps,
 } from '../../../supabase/functions/resolve-doi/resolve.ts';
@@ -290,5 +293,38 @@ describe('resolve-doi', () => {
     expect(devvit.settings.subreddit.predatoryWatchCrossrefMailto).toBeUndefined();
     expect(devvit.settings.subreddit.predatoryWatchCacheTtlHours).toBeUndefined();
     expect(devvit.settings.subreddit.predatoryWatchAllowlist).toBeDefined();
+  });
+});
+
+describe('resolve-doi bearer auth', () => {
+  const token = 'a'.repeat(64);
+
+  it('accepts a server key without loading hashes', async () => {
+    let loaded = false;
+    const ok = await bearerAuthorized('sb_secret_x', ['legacy', 'sb_secret_x'], async () => {
+      loaded = true;
+      return [];
+    });
+    expect(ok).toBe(true);
+    expect(loaded).toBe(false);
+  });
+
+  it('accepts a token whose sha256 is stored', async () => {
+    const hash = await sha256Hex(token);
+    expect(hash).toMatch(/^[0-9a-f]{64}$/);
+    expect(await bearerAuthorized(token, ['legacy'], async () => ['0'.repeat(64), hash.toUpperCase()])).toBe(true);
+  });
+
+  it('rejects a blank, unknown, or raw-hash bearer', async () => {
+    const hash = await sha256Hex(token);
+    expect(await bearerAuthorized('', [''], async () => [hash])).toBe(false);
+    expect(await bearerAuthorized('wrong', ['legacy'], async () => [hash])).toBe(false);
+    expect(await bearerAuthorized(hash, ['legacy'], async () => [hash])).toBe(false);
+  });
+
+  it('compares strings of different lengths safely', () => {
+    expect(timingSafeEqual('abc', 'abc')).toBe(true);
+    expect(timingSafeEqual('abc', 'abcd')).toBe(false);
+    expect(timingSafeEqual('', '')).toBe(true);
   });
 });

@@ -107,6 +107,12 @@
         "label": "Supabase service key",
         "helpText": "Service key for writing bot logs to the bot_logs table. Keep secret.",
         "isSecret": true
+      },
+      "supabaseFunctionToken": {
+        "type": "string",
+        "label": "Supabase function token",
+        "helpText": "Bearer token for the resolve-doi edge function (its SHA-256 is stored in function_tokens). Falls back to the service key when blank. Keep secret.",
+        "isSecret": true
       }
     },
     "subreddit": {

@@ -10,6 +10,8 @@ import {
   extractDois,
   hitKeys,
   hostsFromText,
+  resolveBearer,
+  resolveDoiHeaders,
   isAppAuthor,
   renderWarning,
   warnedPublisherKey,
@@ -35,6 +37,7 @@ export const MODULE = {
     'botSignature',
     'supabaseUrl',
     'supabaseServiceKey',
+    'supabaseFunctionToken',
   ],
 } as const;
 
@@ -239,19 +242,22 @@ async function resolveHits(
   allowlist: string | null,
   matchPublisherName: boolean,
 ): Promise<ResolveResponse | null> {
-  const supabaseUrl = ((await settings.get<string>('supabaseUrl')) || '').replace(/\/$/, '');
-  const supabaseKey = (await settings.get<string>('supabaseServiceKey')) || '';
-  if (!supabaseUrl || !supabaseKey) {
-    log.warn('resolve_unconfigured', { reason: 'supabaseUrl or supabaseServiceKey is blank' });
+  const [rawUrl, functionToken, serviceKey] = await Promise.all([
+    settings.get<string>('supabaseUrl'),
+    settings.get<string>('supabaseFunctionToken'),
+    settings.get<string>('supabaseServiceKey'),
+  ]);
+  const supabaseUrl = (rawUrl || '').replace(/\/$/, '');
+  const bearer = resolveBearer(functionToken, serviceKey);
+  if (!supabaseUrl || !bearer) {
+    log.warn('resolve_unconfigured', {
+      reason: 'supabaseUrl, or both supabaseFunctionToken and supabaseServiceKey, are blank',
+    });
     return null;
   }
   const res = await fetch(`${supabaseUrl}/functions/v1/resolve-doi`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      apikey: supabaseKey,
-      Authorization: `Bearer ${supabaseKey}`,
-    },
+    headers: resolveDoiHeaders(bearer),
     body: JSON.stringify({ hosts, dois, allowlist, matchPublisherName }),
   });
   if (!res.ok) throw new Error(`resolve-doi HTTP ${res.status}`);

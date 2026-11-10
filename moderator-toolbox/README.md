@@ -128,6 +128,7 @@ In the Devvit app settings panel (accessible via the subreddit's app settings), 
 | `geminiApiKey` | Google Gemini API key — required for `!define` term resolution |
 | `supabaseUrl` | Supabase project URL — used for writing bot logs to the `bot_logs` table (optional) |
 | `supabaseServiceKey` | Supabase service key for writing bot logs (optional). Keep secret |
+| `supabaseFunctionToken` | Bearer token for the `resolve-doi` edge function (optional; falls back to `supabaseServiceKey`). Keep secret |
 
 ---
 
@@ -188,17 +189,18 @@ The watchlist lives in Supabase table `predatory_watchlist` and is read on each 
 | `predatoryWatchAllowlist` | `mdpi.com`, `frontiersin.org`, `MDPI`, `Frontiers` |
 | `predatoryWatchMatchPublisherName` | `false` |
 
-Placeholders: `{publisher}`, `{source_list}` or `{source list}`, `{source_url}`. The app calls Supabase with the existing global `supabaseUrl` and `supabaseServiceKey` (`Authorization: Bearer` plus `apikey`, the same headers as the bot-log REST calls). No new Devvit HTTP domains are required: `doi.org`, `api.crossref.org`, and `api.datacite.org` are not in `devvit.json`. The polite Crossref contact address is the function secret `CROSSREF_MAILTO`. Leave it unset to call Crossref with a generic user agent.
+Placeholders: `{publisher}`, `{source_list}` or `{source list}`, `{source_url}`. The app calls `resolve-doi` at `supabaseUrl` with `Authorization: Bearer <supabaseFunctionToken>`, or `supabaseServiceKey` when the token is blank. No `apikey` header is sent; the functions gateway does not need one with `verify_jwt = false`. The function accepts a server key (`SUPABASE_SERVICE_ROLE_KEY` or a `SUPABASE_SECRET_KEYS` entry) or any token whose SHA-256 hex is in `function_tokens` (`016_function_tokens`). No new Devvit HTTP domains are required: `doi.org`, `api.crossref.org`, and `api.datacite.org` are not in `devvit.json`. The polite Crossref contact address is the function secret `CROSSREF_MAILTO`. Leave it unset to call Crossref with a generic user agent.
 
 **Deploying the watchlist and DOI resolver (manual; this repo does not apply it):**
 
-1. Apply `supabase/migrations/014_predatory_watchlist.sql` and `supabase/migrations/015_doi_resolution.sql` to the Supabase project (`eimdgqymjwfljtapnuyl`). Do not apply them from an unattended agent.
+1. Apply `supabase/migrations/014_predatory_watchlist.sql`, `015_doi_resolution.sql`, and `016_function_tokens.sql` to the Supabase project (`eimdgqymjwfljtapnuyl`). Do not apply them from an unattended agent.
 2. Deploy both functions from `moderator-toolbox/`: `supabase functions deploy sync-predatory-watchlist` and `supabase functions deploy resolve-doi`.
 3. Optionally set the Crossref contact: `supabase secrets set CROSSREF_MAILTO=you@example.com`. `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are provided to the function by Supabase.
 4. Schedule the sync daily with `supabase/functions/sync-predatory-watchlist/CRON.sql` (Vault secrets `project_url` and `service_role_key`, cron `0 6 * * *`) or an equivalent Dashboard schedule. The sync function requires `Authorization: Bearer <service role key>`. `resolve-doi` is called on demand by the app and uses the same bearer check (`verify_jwt = false`, matching `process-review`, so a non-JWT service key works).
-5. Until `predatory_watchlist` has rows, `resolve-doi` returns `watchlistCount: 0`. The app does not warn and does not mark the item handled, so a later delivery can retry.
+5. Function token: generate one (`openssl rand -hex 32`), insert only its SHA-256 hex into `function_tokens` (`name = 'moderator-toolbox'`), and set the raw token with `npx devvit settings set supabaseFunctionToken`. To rotate, update the row and the setting. The token only reaches `resolve-doi`; bot-log REST writes still need `supabaseServiceKey`.
+6. Until `predatory_watchlist` has rows, `resolve-doi` returns `watchlistCount: 0`. The app does not warn and does not mark the item handled, so a later delivery can retry.
 
-Local tests: `npm test` covers URL/DOI extraction, domain matching, the allowlist, once-per-publisher filtering, the sync parsers, and `resolve-doi` (cache, Crossref/DataCite hosts, ISSN ignored). Parsers and DOI lookups are not called against the live network during tests.
+Local tests: `npm test` covers URL/DOI extraction, domain matching, the allowlist, once-per-publisher filtering, the sync parsers, and `resolve-doi` (cache, Crossref/DataCite hosts, ISSN ignored, bearer/token auth). Parsers and DOI lookups are not called against the live network during tests.
 
 ### Flood Moderator
 
@@ -527,6 +529,7 @@ If Gemini 2.5 Flash Lite is rate-limited (HTTP 429), the command falls back to G
 | `predatoryWatchMatchPublisherName` | Predatory Journal Watch | boolean | `false` |
 | `supabaseUrl` | Bot logs | string | — |
 | `supabaseServiceKey` | Bot logs | string | — |
+| `supabaseFunctionToken` | Predatory Journal Watch | string | — |
 
 ### Bot Signature
 

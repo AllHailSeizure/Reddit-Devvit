@@ -184,3 +184,41 @@ export async function resolveHits(
   }
   return { hits, watchlistCount: entries.length };
 }
+
+/** Compares two strings without returning early on the first mismatch. */
+export function timingSafeEqual(a: string, b: string): boolean {
+  const left = new TextEncoder().encode(a);
+  const right = new TextEncoder().encode(b);
+  let diff = left.length ^ right.length;
+  const length = Math.max(left.length, right.length);
+  for (let i = 0; i < length; i++) diff |= (left[i] ?? 0) ^ (right[i] ?? 0);
+  return diff === 0;
+}
+
+export async function sha256Hex(value: string): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+/**
+ * True when the bearer equals a server key, or its SHA-256 hex matches
+ * one of the stored function_tokens hashes. Hashes load only when needed.
+ */
+export async function bearerAuthorized(
+  token: string,
+  serverKeys: string[],
+  loadHashes: () => Promise<string[]>,
+): Promise<boolean> {
+  if (!token) return false;
+  let keyMatch = false;
+  for (const key of serverKeys) {
+    if (key && timingSafeEqual(token, key)) keyMatch = true;
+  }
+  if (keyMatch) return true;
+  const hash = await sha256Hex(token);
+  let match = false;
+  for (const stored of await loadHashes()) {
+    if (timingSafeEqual(hash, stored.trim().toLowerCase())) match = true;
+  }
+  return match;
+}
