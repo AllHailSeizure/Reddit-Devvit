@@ -107,6 +107,12 @@
         "label": "Supabase service key",
         "helpText": "Service key for writing bot logs to the bot_logs table. Keep secret.",
         "isSecret": true
+      },
+      "supabaseFunctionToken": {
+        "type": "string",
+        "label": "Supabase function token",
+        "helpText": "Bearer token for the resolve-doi edge function (its SHA-256 is stored in function_tokens). Falls back to the service key when blank. Keep secret.",
+        "isSecret": true
       }
     },
     "subreddit": {
@@ -365,6 +371,36 @@
         "label": "Nonresponder Check — Warning comment",
         "helpText": "Commented (distinguished, stickied, locked) on the new post when the author is a nonresponder. Leave blank to post nothing.",
         "defaultValue": "Responding to commenters is a subreddit rule. You did not respond on your recent qualifying posts. Please engage with the comments on this post by replying to commenters."
+      },
+      "predatoryWatchEnabled": {
+        "type": "boolean",
+        "label": "Predatory Journal Watch — Enable",
+        "helpText": "Warn when a post or comment links a domain on the predatory/hijacked journal watchlist. Nothing is removed or reported.",
+        "defaultValue": true
+      },
+      "predatoryWatchCheckComments": {
+        "type": "boolean",
+        "label": "Predatory Journal Watch — Check comments",
+        "helpText": "Also check new comments. A publisher already warned on that post is not warned again.",
+        "defaultValue": true
+      },
+      "predatoryWatchWarning": {
+        "type": "paragraph",
+        "label": "Predatory Journal Watch — Warning comment",
+        "helpText": "Posted when a watchlisted publisher is linked. Placeholders: {publisher}, {source_list} (or {source list}), {source_url}. Leave blank to post nothing. The bot signature is appended.",
+        "defaultValue": "Note that {publisher} appears on [{source_list}]({source_url}) as a possible [predatory journal](https://en.wikipedia.org/wiki/Predatory_publishing)."
+      },
+      "predatoryWatchAllowlist": {
+        "type": "paragraph",
+        "label": "Predatory Journal Watch — Allowlist",
+        "helpText": "Domains or publisher names that never produce a warning, separated by commas or new lines. Default includes MDPI and Frontiers. Clear the field to stop exempting anyone.",
+        "defaultValue": "mdpi.com\nfrontiersin.org\nMDPI\nFrontiers"
+      },
+      "predatoryWatchMatchPublisherName": {
+        "type": "boolean",
+        "label": "Predatory Journal Watch — Match publisher names",
+        "helpText": "Weak secondary check: compare a DOI's publisher name to watchlist names when the landing domain did not match. Off by default. ISSN is never used.",
+        "defaultValue": false
       }
     }
   },

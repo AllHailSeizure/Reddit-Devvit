@@ -30,6 +30,20 @@ The check scans the author's 50 most recent posts and at most 10 candidate trees
 
 ---
 
+### Predatory journal links (Predatory Journal Watch)
+
+When a post or comment links a journal website that is on the watchlist (or a DOI that lands on one), the bot leaves a note. The note is informational. The bot does not remove the post or comment, lock the user's content, or send it to the mod queue.
+
+On a post, the note is a stickied, distinguished, locked comment. On a comment, it is a distinguished, locked reply. The same publisher is mentioned at most once on a given post. If a later comment links a different publisher, that publisher gets its own note. Several publishers in one post or comment are listed together in a single note.
+
+MDPI and Frontiers are allowlisted by default, so links to them do not produce a note even if an old list mentions them. You can add other domains or publisher names in the app settings (`predatoryWatchAllowlist`), change the wording (`predatoryWatchWarning`), or turn the check off (`predatoryWatchEnabled`). Clearing the warning text makes the bot stay quiet. Comment checking is on by default (`predatoryWatchCheckComments`).
+
+The check needs the app-level secret `supabaseFunctionToken` (or `supabaseServiceKey`) to reach the Supabase watchlist. If neither is set, the bot stays quiet rather than guessing.
+
+The lists behind the warning are the Retraction Watch Hijacked Journal Checker (hijacked sites only) and Beall's List. They are refreshed outside the bot. A newly added or removed site is used the next time someone posts or comments. There is no separate delay setting.
+
+---
+
 ### Posting Quota (Flood Moderator)
 
 The bot limits how often a user can post. By default, a user can post once every 24 hours. If someone posts more than that, their extra post is automatically removed.

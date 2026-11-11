@@ -369,6 +369,15 @@ allow_dynamic_registration = false
 [functions.process-review]
 verify_jwt = false
 
+# Auth is checked inside the function (bearer must equal the service role key).
+# verify_jwt stays false so a non-JWT service key can still invoke the sync.
+[functions.sync-predatory-watchlist]
+verify_jwt = false
+
+# Same auth as sync-predatory-watchlist: the function checks the bearer itself.
+[functions.resolve-doi]
+verify_jwt = false
+
 [edge_runtime]
 enabled = true
 # Supported request policies: `oneshot`, `per_worker`.

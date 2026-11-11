@@ -58,6 +58,7 @@ src/server/
 │   ├── depth-cap-moderator.ts       Comment depth enforcement
 │   ├── self-response-moderator.ts   OP self-reply enforcement
 │   ├── nonresponder-check.ts        OP participation warning
+│   ├── predatory-journal-watch.ts   Predatory/hijacked journal warning
 │   ├── length-moderator.ts          Post length enforcement
 │   └── report-moderator.ts          Bot-report ignorer
 ├── action-modules/
@@ -127,6 +128,7 @@ In the Devvit app settings panel (accessible via the subreddit's app settings), 
 | `geminiApiKey` | Google Gemini API key — required for `!define` term resolution |
 | `supabaseUrl` | Supabase project URL — used for writing bot logs to the `bot_logs` table (optional) |
 | `supabaseServiceKey` | Supabase service key for writing bot logs (optional). Keep secret |
+| `supabaseFunctionToken` | Bearer token for the `resolve-doi` edge function (optional; falls back to `supabaseServiceKey`). Keep secret |
 
 ---
 
@@ -161,6 +163,44 @@ Settings are in the app installation settings (`devvit.json` → `settings.subre
 
 
 Invalid numeric thresholds use defaults. A blank warning suppresses posting. Live testing should verify nested replies, removed/deleted comments, exemption settings, duplicate delivery, warning locking/stickying, report delivery, and warning tracking/fallback. Local decision tests: `npm test` (from `moderator-toolbox/`).
+
+### Predatory Journal Watch
+
+**File:** `src/server/trigger-modules/predatory-journal-watch.ts` (pure decisions in `predatory-journal-decision.ts`)
+**Triggers:** `onPostSubmit`, `onCommentCreate`
+
+Integrity warning only. The module never removes, locks the user's content, or files a report. It looks for journal links and DOIs in the post body and link URL, and in comment bodies when `predatoryWatchCheckComments` is on.
+
+A direct link matches when its host is a watchlist domain or a subdomain of one (`www.` is ignored). The app does not call doi.org, Crossref, or DataCite. It sends the extracted hosts and DOIs to the Supabase `resolve-doi` edge function, which resolves each DOI (`doi.org/doiRA`, then Crossref or DataCite) and applies the same domain rules. Publisher-name matching is a weak secondary check and is off by default. ISSN is never used. Malformed DOIs that do not start with `10.` are ignored. DOI results are cached in the `doi_resolution` table for 14 days. A 4xx is cached as a miss; a 5xx is not cached.
+
+The watchlist lives in Supabase table `predatory_watchlist` and is read on each check, so a sync is visible on the next post or comment. The daily refresh is the `sync-predatory-watchlist` edge function (Retraction Watch hijacked URLs only, plus Beall's List publisher, standalone, and hijacked pages). See the deploy notes below. An allowlist of domains or publisher names never warns; the default includes MDPI (`mdpi.com`) and Frontiers (`frontiersin.org`). Clearing the allowlist removes those exemptions. Name tokens match whole words, so the default name `Frontiers` also covers "Frontiers Media". The allowlist and the publisher-name switch are per-subreddit settings passed to `resolve-doi`.
+
+**What gets posted.** Several publishers in one post or comment are combined into a single comment, one paragraph per publisher, using `predatoryWatchWarning` plus `botSignature`. A blank warning posts nothing. On a post the comment is top-level, distinguished, stickied, and locked. On a comment it is a reply, distinguished and locked (a reply cannot be stickied). The app account, and comments it wrote, are skipped.
+
+**Once per publisher per post.** Redis keys `bot:pjmod:pub:{postId}:{publisherKey}` last 180 days. If that publisher was already warned on the post, a later comment that links it does nothing. A comment that also links a new publisher warns about the new one only. Trigger retries are deduped with `bot:pjmod:handled:{contentId}` for 7 days.
+
+**Settings** (`devvit.json` → `settings.subreddit`):
+
+| Key | Default |
+|-----|---------|
+| `predatoryWatchEnabled` | `true` |
+| `predatoryWatchCheckComments` | `true` |
+| `predatoryWatchWarning` | `Note that {publisher} appears on [{source_list}]({source_url}) as a possible [predatory journal](https://en.wikipedia.org/wiki/Predatory_publishing).` |
+| `predatoryWatchAllowlist` | `mdpi.com`, `frontiersin.org`, `MDPI`, `Frontiers` |
+| `predatoryWatchMatchPublisherName` | `false` |
+
+Placeholders: `{publisher}`, `{source_list}` or `{source list}`, `{source_url}`. The app calls `resolve-doi` at `supabaseUrl` with `Authorization: Bearer <supabaseFunctionToken>`, or `supabaseServiceKey` when the token is blank. No `apikey` header is sent; the functions gateway does not need one with `verify_jwt = false`. The function accepts a server key (`SUPABASE_SERVICE_ROLE_KEY` or a `SUPABASE_SECRET_KEYS` entry) or any token whose SHA-256 hex is in `function_tokens` (`016_function_tokens`). No new Devvit HTTP domains are required: `doi.org`, `api.crossref.org`, and `api.datacite.org` are not in `devvit.json`. The polite Crossref contact address is the function secret `CROSSREF_MAILTO`. Leave it unset to call Crossref with a generic user agent.
+
+**Deploying the watchlist and DOI resolver (manual; this repo does not apply it):**
+
+1. Apply `supabase/migrations/014_predatory_watchlist.sql`, `015_doi_resolution.sql`, and `016_function_tokens.sql` to the Supabase project (`eimdgqymjwfljtapnuyl`). Do not apply them from an unattended agent.
+2. Deploy both functions from `moderator-toolbox/`: `supabase functions deploy sync-predatory-watchlist` and `supabase functions deploy resolve-doi`.
+3. Optionally set the Crossref contact: `supabase secrets set CROSSREF_MAILTO=you@example.com`. `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are provided to the function by Supabase.
+4. Schedule the sync daily with `supabase/functions/sync-predatory-watchlist/CRON.sql` (Vault secrets `project_url` and `service_role_key`, cron `0 6 * * *`) or an equivalent Dashboard schedule. The sync function requires `Authorization: Bearer <service role key>`. `resolve-doi` is called on demand by the app and uses the same bearer check (`verify_jwt = false`, matching `process-review`, so a non-JWT service key works).
+5. Function token: generate one (`openssl rand -hex 32`), insert only its SHA-256 hex into `function_tokens` (`name = 'moderator-toolbox'`), and set the raw token with `npx devvit settings set supabaseFunctionToken`. To rotate, update the row and the setting. The token only reaches `resolve-doi`; bot-log REST writes still need `supabaseServiceKey`.
+6. Until `predatory_watchlist` has rows, `resolve-doi` returns `watchlistCount: 0`. The app does not warn and does not mark the item handled, so a later delivery can retry.
+
+Local tests: `npm test` covers URL/DOI extraction, domain matching, the allowlist, once-per-publisher filtering, the sync parsers, and `resolve-doi` (cache, Crossref/DataCite hosts, ISSN ignored, bearer/token auth). Parsers and DOI lookups are not called against the live network during tests.
 
 ### Flood Moderator
 
@@ -482,8 +522,14 @@ If Gemini 2.5 Flash Lite is rate-limited (HTTP 429), the command falls back to G
 | `responseToolEnabled` | Saved Responses | boolean | `true` |
 | `defineCommandEnabled` | !define | boolean | `true` |
 | `geminiApiKey` | !define | string | — |
+| `predatoryWatchEnabled` | Predatory Journal Watch | boolean | `true` |
+| `predatoryWatchCheckComments` | Predatory Journal Watch | boolean | `true` |
+| `predatoryWatchWarning` | Predatory Journal Watch | string | predatory-journal note |
+| `predatoryWatchAllowlist` | Predatory Journal Watch | string | MDPI, Frontiers |
+| `predatoryWatchMatchPublisherName` | Predatory Journal Watch | boolean | `false` |
 | `supabaseUrl` | Bot logs | string | — |
 | `supabaseServiceKey` | Bot logs | string | — |
+| `supabaseFunctionToken` | Predatory Journal Watch | string | — |
 
 ### Bot Signature
 
