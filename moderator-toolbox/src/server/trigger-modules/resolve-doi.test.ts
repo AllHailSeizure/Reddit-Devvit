@@ -280,6 +280,22 @@ describe('resolve-doi', () => {
     expect(calls).toBe(0);
   });
 
+  it('strips a markdown autolink tail from a DOI before lookup', async () => {
+    const dirty = '10.1000/hijack](https://doi.org/10.1000/hijack)';
+    const seen: string[] = [];
+    const result = await resolveHits({ dois: [dirty], allowlist: '' }, watchlist, {
+      ...memoryCache(),
+      fetchImpl: async (input) => {
+        const url = String(input);
+        seen.push(url);
+        if (url.startsWith('https://doi.org/doiRA/')) return jsonResponse([{ RA: 'Crossref' }]);
+        return jsonResponse({ message: { URL: 'https://hijack.example/article', publisher: 'Adalya' } });
+      },
+    });
+    expect(seen[0]).toBe(`https://doi.org/doiRA/${encodeURIComponent(DOI)}`);
+    expect(result.hits.map((hit) => hit.publisherKey)).toEqual(['hijack.example']);
+  });
+
   it('leaves doi.org, Crossref, and DataCite off the Devvit HTTP allowlist', () => {
     const devvit = JSON.parse(readFileSync(new URL('../../../devvit.json', import.meta.url), 'utf8')) as {
       permissions: { http: { domains: string[] } };

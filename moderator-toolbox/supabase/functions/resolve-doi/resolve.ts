@@ -5,6 +5,7 @@
  */
 import {
   DOI_CACHE_TTL_MS,
+  cleanDoi,
   hostsFromCrossref,
   hostsFromDatacite,
   matchPublication,
@@ -78,14 +79,8 @@ function cleanDois(value: unknown): string[] {
   const dois: string[] = [];
   const seen = new Set<string>();
   for (const raw of asStringList(value, MAX_DOIS)) {
-    let doi = raw;
-    try {
-      doi = decodeURIComponent(raw);
-    } catch {
-      // Keep the raw value.
-    }
-    doi = doi.trim().toLowerCase();
-    if (!/^10\.\d{4,9}\//.test(doi) || seen.has(doi)) continue;
+    const doi = cleanDoi(raw);
+    if (!doi || seen.has(doi)) continue;
     seen.add(doi);
     dois.push(doi);
   }

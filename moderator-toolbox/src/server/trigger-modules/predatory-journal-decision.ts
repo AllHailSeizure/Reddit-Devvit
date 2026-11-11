@@ -109,6 +109,10 @@ export function domainMatches(candidateHost: string, watchDomain: string): boole
 
 function trimUrl(raw: string): string {
   let url = raw;
+  // Reddit stores autolinked URLs as [url](url). The extractor starts at the
+  // first https and would otherwise swallow the "](https://..." tail.
+  const markdownSplit = url.search(/\]\(/);
+  if (markdownSplit > 0) url = url.slice(0, markdownSplit);
   while (url.length > 0 && /[.,;:!?]$/.test(url)) url = url.slice(0, -1);
   while (url.endsWith(')') && (url.match(/\(/g) ?? []).length < (url.match(/\)/g) ?? []).length) {
     url = url.slice(0, -1);
@@ -134,7 +138,7 @@ export function extractUrls(text: string): string[] {
   return found;
 }
 
-function cleanDoi(raw: string): string | null {
+export function cleanDoi(raw: string): string | null {
   let doi = raw.trim();
   try {
     doi = decodeURIComponent(doi);
@@ -142,6 +146,8 @@ function cleanDoi(raw: string): string | null {
     // Keep the raw suffix when it is not valid percent-encoding.
   }
   doi = doi.replace(/^[^\d]*/, '');
+  const markdownSplit = doi.search(/\]\(/);
+  if (markdownSplit > 0) doi = doi.slice(0, markdownSplit);
   while (doi.length > 0 && /[.,;:!?)]$/.test(doi)) {
     if (doi.endsWith(')') && (doi.match(/\(/g) ?? []).length >= (doi.match(/\)/g) ?? []).length) break;
     doi = doi.slice(0, -1);
@@ -382,7 +388,7 @@ function uniqueHosts(urls: string[]): string[] {
   const seen = new Set<string>();
   for (const url of urls) {
     const host = hostFromUrl(url);
-    if (!host || seen.has(host)) continue;
+    if (!host || host === 'doi.org' || host === 'dx.doi.org' || seen.has(host)) continue;
     seen.add(host);
     hosts.push(host);
   }

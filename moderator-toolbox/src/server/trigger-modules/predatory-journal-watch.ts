@@ -69,12 +69,21 @@ export async function runOnPost(event: OnPostSubmitRequest): Promise<void> {
 
 export async function runOnComment(event: OnCommentCreateRequest): Promise<void> {
   const enabled = (await settings.get<boolean>('predatoryWatchEnabled')) ?? true;
-  if (!enabled) return;
+  if (!enabled) {
+    log.info('skipped', { reason: 'disabled', postId: event.post?.id, commentId: event.comment?.id });
+    return;
+  }
   const checkComments = (await settings.get<boolean>('predatoryWatchCheckComments')) ?? true;
-  if (!checkComments) return;
+  if (!checkComments) {
+    log.info('skipped', { reason: 'comments_disabled', postId: event.post?.id, commentId: event.comment?.id });
+    return;
+  }
   const comment = event.comment;
   const postId = event.post?.id || comment?.postId;
-  if (!comment?.id || !postId) return;
+  if (!comment?.id || !postId) {
+    log.info('skipped', { reason: 'missing_comment_or_post', commentId: comment?.id, postId });
+    return;
+  }
   await scan({
     kind: 'comment',
     postId,
@@ -87,11 +96,21 @@ export async function runOnComment(event: OnCommentCreateRequest): Promise<void>
 }
 
 async function scan(target: ScanTarget): Promise<void> {
+  const ctx = { postId: target.postId, commentId: target.commentId, kind: target.kind };
   try {
     const enabled = (await settings.get<boolean>('predatoryWatchEnabled')) ?? true;
-    if (!enabled) return;
-    if (await redis.get(`bot:pjmod:handled:${target.contentId}`)) return;
-    if (!target.authorName || target.authorName.toLowerCase() === '[deleted]') return;
+    if (!enabled) {
+      log.info('skipped', { reason: 'disabled', ...ctx });
+      return;
+    }
+    if (await redis.get(`bot:pjmod:handled:${target.contentId}`)) {
+      log.info('skipped', { reason: 'already_handled', ...ctx });
+      return;
+    }
+    if (!target.authorName || target.authorName.toLowerCase() === '[deleted]') {
+      log.info('skipped', { reason: 'no_author', ...ctx });
+      return;
+    }
 
     const [warning, allowRaw, matchNames, signature] = await Promise.all([
       settings.get<string>('predatoryWatchWarning'),
@@ -100,28 +119,40 @@ async function scan(target: ScanTarget): Promise<void> {
       settings.get<string>('botSignature'),
     ]);
     const template = warning ?? DEFAULT_WARNING;
-    if (!template.trim()) return;
+    if (!template.trim()) {
+      log.info('skipped', { reason: 'blank_warning_template', ...ctx });
+      return;
+    }
 
     const directHosts = hostsFromText(target.text);
     const dois = extractDois(target.text);
     if (directHosts.length === 0 && dois.length === 0) {
       await markHandled(target.contentId);
+      log.info('skipped', { reason: 'no_urls_or_dois', ...ctx });
       return;
     }
 
     const appUser = await reddit.getAppUser();
-    if (!appUser?.username) return;
+    if (!appUser?.username) {
+      log.info('skipped', { reason: 'no_app_user', ...ctx });
+      return;
+    }
     if (isAppAuthor(target.authorName, appUser.username)) {
       await markHandled(target.contentId);
+      log.info('skipped', { reason: 'app_author', ...ctx });
       return;
     }
 
     const resolved = await resolveHits(directHosts, dois, allowRaw ?? null, matchNames ?? false);
     // Missing Supabase settings, or an empty watchlist, should retry on the next delivery.
-    if (!resolved || resolved.watchlistCount === 0) return;
+    if (!resolved || resolved.watchlistCount === 0) {
+      log.info('skipped', { reason: resolved ? 'watchlist_empty' : 'resolve_unconfigured', ...ctx, dois, hosts: directHosts });
+      return;
+    }
     const hits = resolved.hits;
     if (hits.length === 0) {
       await markHandled(target.contentId);
+      log.info('skipped', { reason: 'no_watchlist_hits', ...ctx, dois, hosts: directHosts });
       return;
     }
 
@@ -135,10 +166,18 @@ async function scan(target: ScanTarget): Promise<void> {
     }
 
     const fresh = await claimPublishers(target.postId, hits);
-    if (fresh.length === 0) return;
+    if (fresh.length === 0) {
+      log.info('skipped', {
+        reason: 'already_warned_publisher',
+        ...ctx,
+        publishers: hits.map((hit) => hit.publisherKey),
+      });
+      return;
+    }
     const text = renderWarning(template, fresh) + formatSignature(signature ?? '');
     if (!text.trim()) {
       await releaseClaims(target.postId, target.contentId, fresh);
+      log.info('skipped', { reason: 'blank_rendered_warning', ...ctx });
       return;
     }
 

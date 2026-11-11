@@ -254,7 +254,9 @@ export function parseBeallsHijackedHtml(html) {
   return dedupe(entries);
 }
 
-const LIST_RANK = { hijacked: 3, standalone: 2, publisher: 1 };
+// Hijacked wins. A publisher row wins over a standalone journal that reuses
+// the publisher domain (e.g. scirp.org listed both as SCIRP and as one journal).
+const LIST_RANK = { hijacked: 3, publisher: 2, standalone: 1 };
 
 export function mergeRows(rows) {
   const map = new Map();

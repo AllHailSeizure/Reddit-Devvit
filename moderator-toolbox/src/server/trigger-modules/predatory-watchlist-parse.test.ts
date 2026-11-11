@@ -97,6 +97,18 @@ describe('predatory watchlist parsers', () => {
     ]);
     expect(merged).toEqual([{ domain: 'adalya.example', name: 'Adalya', listType: 'hijacked' }]);
   });
+
+  it('keeps the publisher name when a standalone journal reuses the publisher domain', () => {
+    const merged = mergeRows([
+      { domain: 'scirp.org', name: 'Scientific Research Publishing (SCIRP)', listType: 'publisher' },
+      { domain: 'scirp.org', name: 'Advances in Aerospace Science and Technology', listType: 'standalone' },
+    ]);
+    expect(merged).toEqual([{
+      domain: 'scirp.org',
+      name: 'Scientific Research Publishing (SCIRP)',
+      listType: 'publisher',
+    }]);
+  });
 });
 
 describe('watchlist source registry', () => {

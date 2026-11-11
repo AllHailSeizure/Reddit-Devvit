@@ -64,6 +64,13 @@ describe('url and doi extraction', () => {
   it('does not treat a doi.org link as a publisher host', () => {
     expect(hostsFromText('https://doi.org/10.1000/xyz and https://hijack.example/paper')).toEqual(['hijack.example']);
   });
+
+  it('extracts a DOI from a markdown-wrapped doi.org autolink', () => {
+    const body = '[https://doi.org/10.4236/wjm.2017.710022](https://doi.org/10.4236/wjm.2017.710022)';
+    expect(extractUrls(body)).toEqual(['https://doi.org/10.4236/wjm.2017.710022']);
+    expect(extractDois(body)).toEqual(['10.4236/wjm.2017.710022']);
+    expect(hostsFromText(body)).toEqual([]);
+  });
 });
 
 describe('domain normalization and matching', () => {
@@ -128,6 +135,14 @@ describe('allowlist and matching', () => {
     });
     expect(crossref.hosts).toEqual(['hijack.example', 'cdn.hijack.example']);
     expect(hostsFromCrossref({ message: { ISSN: ['1234-5678'], publisher: 'Adalya' } }).hosts).toEqual([]);
+    expect(hostsFromCrossref({
+      message: {
+        URL: 'https://doi.org/10.4236/wjm.2017.710022',
+        publisher: 'Scientific Research Publishing, Inc.',
+        link: [{ URL: 'http://www.scirp.org/journal/doi.aspx?DOI=10.4236/wjm.2017.710022' }],
+        resource: { primary: { URL: 'http://www.scirp.org/journal/doi.aspx?DOI=10.4236/wjm.2017.710022' } },
+      },
+    })).toEqual({ hosts: ['scirp.org'], publisher: 'Scientific Research Publishing, Inc.' });
     expect(hostsFromDatacite({
       data: { attributes: { url: 'https://zenodo.org/records/1', publisher: { name: 'Zenodo' } } },
     })).toEqual({ hosts: ['zenodo.org'], publisher: 'Zenodo' });
