@@ -1,6 +1,6 @@
 {
   "scripts": {
-    "check": "npm run check --workspace ./moderator-toolbox --workspace ./adversarial-review --workspace ./sub-bingo"
+    "check": "npm run check --workspace ./moderator-toolbox --workspace ./adversarial-review --workspace ./sub-bingo --workspace ./tap-the-sign"
   },
   "workspaces": [
     "packages/*",
