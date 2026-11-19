@@ -8,7 +8,7 @@ on:
         description: App directory to release
         required: true
         type: choice
-        options: [moderator-toolbox, adversarial-review, sub-bingo]
+        options: [moderator-toolbox, adversarial-review, sub-bingo, tap-the-sign]
       version:
         description: Exact stable version to publish (for example 2.16.0)
         required: true
@@ -44,7 +44,7 @@ jobs:
             exit 1
           fi
           case "$APP" in
-            moderator-toolbox|adversarial-review|sub-bingo) ;;
+            moderator-toolbox|adversarial-review|sub-bingo|tap-the-sign) ;;
             *) echo '::error::Unknown app.'; exit 1 ;;
           esac
           if ! [[ "$RELEASE_VERSION" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
