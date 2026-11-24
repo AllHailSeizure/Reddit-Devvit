@@ -2,6 +2,7 @@
   "name": "llmphysics-bot",
   "version": "2.15.2.1",
   "private": true,
+  "license": "MIT",
   "scripts": {
     "build": "vite build",
     "build:categories": "node scripts/build-category-db.mjs",

@@ -2,6 +2,7 @@
   "name": "adversarial-review",
   "version": "1.0.0",
   "private": true,
+  "license": "MIT",
   "scripts": {
     "check": "npm run build",
     "build": "vite build",
