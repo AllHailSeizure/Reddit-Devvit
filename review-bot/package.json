@@ -2,6 +2,7 @@
   "name": "review-bot",
   "version": "1.0.0",
   "private": true,
+  "license": "MIT",
   "scripts": {
     "build": "vite build",
     "dev": "devvit playtest r/llmphysics_dev",

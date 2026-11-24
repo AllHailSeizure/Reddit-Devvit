@@ -2,6 +2,7 @@
   "name": "tap-the-sign",
   "version": "1.0.0",
   "private": true,
+  "license": "MIT",
   "scripts": {
     "check": "npm test && npm run build",
     "build": "vite build",
